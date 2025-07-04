@@ -25,6 +25,18 @@ class VideoConfigDialog:
 
         self.setup_dialog_ui(video_path, text_content, text_config)
 
+    def update_scale_value(self, value, label_widget, decimals=0):
+        """Update the label next to a scale with the current value"""
+        try:
+            if decimals == 0:
+                display_value = int(float(value))
+                label_widget.config(text=str(display_value))
+            else:
+                display_value = round(float(value), decimals)
+                label_widget.config(text=f"{display_value:.{decimals}f}")
+        except ValueError:
+            pass
+
     def setup_dialog_ui(self, video_path, text_content, text_config):
         main_frame = ttk.Frame(self.dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -70,14 +82,19 @@ class VideoConfigDialog:
         self.update_duration_visibility() # Call this first to ensure correct initial state
         self.toggle_position_controls()
 
-
     def setup_config_controls(self, parent_frame, config):
         row_idx = 0
 
         # Font Size
         ttk.Label(parent_frame, text="Font Size:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
         self.fontsize_var = tk.IntVar(value=config['fontsize'])
-        ttk.Scale(parent_frame, from_=20, to=150, variable=self.fontsize_var, orient=tk.HORIZONTAL).grid(row=row_idx, column=1, sticky=(tk.W, tk.E))
+        self.fontsize_value = ttk.Label(parent_frame, text=str(self.fontsize_var.get()))
+        self.fontsize_value.grid(row=row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
+
+        fontsize_scale = ttk.Scale(parent_frame, from_=20, to=150, variable=self.fontsize_var,
+                                   orient=tk.HORIZONTAL,
+                                   command=lambda v: self.update_scale_value(v, self.fontsize_value))
+        fontsize_scale.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
         row_idx += 1
 
         # Color
@@ -92,12 +109,18 @@ class VideoConfigDialog:
         # Opacity
         ttk.Label(parent_frame, text="Opacity:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
         self.opacity_var = tk.DoubleVar(value=config['opacity'])
-        ttk.Scale(parent_frame, from_=0.1, to=1.0, variable=self.opacity_var, orient=tk.HORIZONTAL).grid(row=row_idx, column=1, sticky=(tk.W, tk.E))
+        self.opacity_value = ttk.Label(parent_frame, text=f"{self.opacity_var.get():.1f}")
+        self.opacity_value.grid(row=row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
+
+        opacity_scale = ttk.Scale(parent_frame, from_=0.1, to=1.0, variable=self.opacity_var,
+                                  orient=tk.HORIZONTAL,
+                                  command=lambda v: self.update_scale_value(v, self.opacity_value, 1))
+        opacity_scale.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
         row_idx += 1
 
-        # Placeholder for image duration. Their actual creation/gridding is in update_duration_visibility
-        self.duration_row_idx = row_idx # Store row index for duration widgets
-        row_idx += 1 # Increment for the next set of controls
+        # Placeholder for image duration
+        self.duration_row_idx = row_idx
+        row_idx += 1
 
         # Movement
         ttk.Label(parent_frame, text="Animation:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
@@ -179,16 +202,23 @@ class VideoConfigDialog:
             # Create widgets if they don't exist
             if self.duration_label is None:
                 self.duration_label = ttk.Label(self.config_frame, text="Duration (seconds):")
-                self.duration_scale = ttk.Scale(self.config_frame, from_=1, to=30, variable=self.duration_var, orient=tk.HORIZONTAL)
+                self.duration_var = tk.IntVar(value=self.initial_image_duration)
+                self.duration_value = ttk.Label(self.config_frame, text=str(self.duration_var.get()))
+                self.duration_scale = ttk.Scale(self.config_frame, from_=1, to=30, variable=self.duration_var,
+                                                orient=tk.HORIZONTAL,
+                                                command=lambda v: self.update_scale_value(v, self.duration_value))
 
             # Place them in the correct grid positions
             self.duration_label.grid(row=self.duration_row_idx, column=0, sticky=tk.W, pady=5)
             self.duration_scale.grid(row=self.duration_row_idx, column=1, sticky=(tk.W, tk.E))
+            self.duration_value.grid(row=self.duration_row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
         else:
             # Hide/destroy if not an image
             if self.duration_label is not None:
                 self.duration_label.grid_forget()
                 self.duration_scale.grid_forget()
+                if hasattr(self, 'duration_value'):
+                    self.duration_value.grid_forget()
 
     def choose_color(self):
         color = colorchooser.askcolor(title="Choose text color")
