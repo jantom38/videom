@@ -23,12 +23,11 @@ class MoviePyProgressLogger:
         """
         Obsługa paska postępu MoviePy, zgodna z API MoviePy 2.x.
         """
-        iterable = kwargs.get("t", None)
-        if iterable is None:
-            iterable = kwargs.get("iterable", None)
+        iterable = kwargs.get("t", kwargs.get("iterable", None))
 
         if iterable is None:
-            raise ValueError("No iterable provided to iter_bar")
+            # Jeśli nie ma iterable, po prostu zwróć pusty iterator
+            return iter([])
 
         try:
             total = len(iterable)
@@ -201,7 +200,7 @@ class VideoMerger:
 
             final_video.write_videofile(
                 output_path,
-                fps=24,
+                fps=29,
                 codec='libx264',
                 audio_codec='aac',
                 threads=os.cpu_count(),
