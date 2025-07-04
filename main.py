@@ -18,10 +18,10 @@ import threading
 from pathlib import Path
 import sys
 import os
-os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
+# Upewnij się, że ta ścieżka jest poprawna dla Twojego systemu lub usuń tę linię, jeśli ImageMagick jest w PATH
+# os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q8\magick.exe'
 
 # Import the VideoMerger class from the previous script
-import os
 import sys
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips
 import math
@@ -72,6 +72,7 @@ class VideoMerger:
         elif config['movement'] == 'float':
             txt_clip = txt_clip.set_position(self._float_position(duration))
         else:
+            # Ta linia obsługuje teraz zarówno słowa kluczowe ('center', 'top'), jak i współrzędne (x, y)
             txt_clip = txt_clip.set_position(config['position'])
 
         return txt_clip
@@ -228,20 +229,22 @@ class VideoMergerGUI:
         list_label.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(0, 10))
 
         # Create treeview for video list
-        columns = ('Order', 'Video File', 'Text Overlay', 'Animation', 'Color')
-        self.tree = ttk.Treeview(parent, columns=columns, show='headings', height=8)
+        columns = ('Order', 'Video File', 'Text Overlay', 'Animation', 'Position', 'Color')
+        self.tree = ttk.Treeview(parent, columns=columns, show='headings', height=10)
 
         # Define column headings and widths
         self.tree.heading('Order', text='#')
         self.tree.heading('Video File', text='Video File')
         self.tree.heading('Text Overlay', text='Text Overlay')
         self.tree.heading('Animation', text='Animation')
+        self.tree.heading('Position', text='Position')
         self.tree.heading('Color', text='Color')
 
-        self.tree.column('Order', width=50)
+        self.tree.column('Order', width=40, anchor='center')
         self.tree.column('Video File', width=200)
         self.tree.column('Text Overlay', width=150)
         self.tree.column('Animation', width=100)
+        self.tree.column('Position', width=100, anchor='center')
         self.tree.column('Color', width=80)
 
         # Add scrollbar
@@ -328,7 +331,7 @@ class VideoMergerGUI:
             video_path, text_content, text_config = dialog.result
             self.merger.add_video(video_path, text_content, text_config)
             self.update_video_list()
-            print(f"Added video: {video_path}")  # Debug print
+            print(f"Added video: {video_path}")
 
     def edit_video_dialog(self):
         """Open dialog to edit selected video"""
@@ -347,7 +350,7 @@ class VideoMergerGUI:
                                    video_path=current_video,
                                    text_content=current_text_data['text'],
                                    text_config=current_text_data['config'])
-        self.root.wait_window(dialog.dialog)  # Wait for dialog to close
+        self.root.wait_window(dialog.dialog)
         if dialog.result:
             video_path, text_content, text_config = dialog.result
             self.merger.videos[index] = video_path
@@ -364,11 +367,14 @@ class VideoMergerGUI:
             messagebox.showwarning("No Selection", "Please select a video to remove.")
             return
 
-        item = selection[0]
-        index = int(self.tree.item(item, 'values')[0]) - 1
+        selected_items = self.tree.selection()
+        # Get indices and sort them in reverse to avoid index shifting issues
+        indices = sorted([int(self.tree.item(item, 'values')[0]) - 1 for item in selected_items], reverse=True)
 
-        self.merger.videos.pop(index)
-        self.merger.text_configs.pop(index)
+        for index in indices:
+            self.merger.videos.pop(index)
+            self.merger.text_configs.pop(index)
+
         self.update_video_list()
 
     def move_video_up(self):
@@ -378,15 +384,16 @@ class VideoMergerGUI:
             return
 
         item = selection[0]
-        index = int(self.tree.item(item, 'values')[0]) - 1
+        index = self.tree.index(item)
 
         if index > 0:
-            # Swap with previous item
-            self.merger.videos[index], self.merger.videos[index - 1] = \
-                self.merger.videos[index - 1], self.merger.videos[index]
-            self.merger.text_configs[index], self.merger.text_configs[index - 1] = \
-                self.merger.text_configs[index - 1], self.merger.text_configs[index]
+            self.merger.videos.insert(index - 1, self.merger.videos.pop(index))
+            self.merger.text_configs.insert(index - 1, self.merger.text_configs.pop(index))
             self.update_video_list()
+            # Reselect the item that was moved
+            new_selection_id = self.tree.get_children()[index - 1]
+            self.tree.selection_set(new_selection_id)
+            self.tree.focus(new_selection_id)
 
     def move_video_down(self):
         """Move selected video down in the list"""
@@ -395,15 +402,16 @@ class VideoMergerGUI:
             return
 
         item = selection[0]
-        index = int(self.tree.item(item, 'values')[0]) - 1
+        index = self.tree.index(item)
 
         if index < len(self.merger.videos) - 1:
-            # Swap with next item
-            self.merger.videos[index], self.merger.videos[index + 1] = \
-                self.merger.videos[index + 1], self.merger.videos[index]
-            self.merger.text_configs[index], self.merger.text_configs[index + 1] = \
-                self.merger.text_configs[index + 1], self.merger.text_configs[index]
+            self.merger.videos.insert(index + 1, self.merger.videos.pop(index))
+            self.merger.text_configs.insert(index + 1, self.merger.text_configs.pop(index))
             self.update_video_list()
+            # Reselect the item that was moved
+            new_selection_id = self.tree.get_children()[index + 1]
+            self.tree.selection_set(new_selection_id)
+            self.tree.focus(new_selection_id)
 
     def clear_all_videos(self):
         """Clear all videos from the list"""
@@ -415,23 +423,28 @@ class VideoMergerGUI:
 
     def update_video_list(self):
         """Update the video list display"""
-        # Clear existing items
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        # Add current videos
         for i, (video_path, text_data) in enumerate(zip(self.merger.videos, self.merger.text_configs)):
             filename = os.path.basename(video_path)
+            config = text_data['config']
             text_content = text_data['text']
-            animation = text_data['config']['movement']
-            color = text_data['config']['color']
+            animation = config['movement']
+            color = config['color']
 
-            self.tree.insert('', 'end', values=(i + 1, filename, text_content, animation, color))
+            position = config.get('position', '-')
+            if animation == 'static':
+                if isinstance(position, (tuple, list)):
+                    pos_display = f"({position[0]}, {position[1]})"
+                else:
+                    pos_display = str(position)
+            else:
+                pos_display = "Auto"
 
-        # Debug print
+            self.tree.insert('', 'end', values=(i + 1, filename, text_content, animation, pos_display, color))
+
         print(f"Video list updated. Total videos: {len(self.merger.videos)}")
-        for i, video in enumerate(self.merger.videos):
-            print(f"  {i + 1}: {os.path.basename(video)}")
 
     def browse_output_file(self):
         """Browse for output file location"""
@@ -454,11 +467,9 @@ class VideoMergerGUI:
             messagebox.showwarning("No Output File", "Please specify an output file.")
             return
 
-        # Start progress bar
         self.progress_bar.start()
         self.status_var.set("Processing...")
 
-        # Start merging in separate thread
         thread = threading.Thread(target=self.merge_videos_thread, args=(output_path,))
         thread.daemon = True
         thread.start()
@@ -470,8 +481,6 @@ class VideoMergerGUI:
             self.root.after(0, lambda: self.status_var.set(message))
 
         success, message = self.merger.merge_videos(output_path, progress_callback)
-
-        # Update UI in main thread
         self.root.after(0, lambda: self.merge_complete(success, message))
 
     def merge_complete(self, success, message):
@@ -489,19 +498,16 @@ class VideoMergerGUI:
 class VideoConfigDialog:
     def __init__(self, parent, title, video_path="", text_content="", text_config=None):
         self.result = None
-
-        # Create dialog window
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(title)
-        self.dialog.geometry("500x600")
+        self.dialog.geometry("500x650")  # Zwiększona wysokość
         self.dialog.transient(parent)
         self.dialog.grab_set()
 
-        # Center the dialog
         self.dialog.update_idletasks()
         x = (self.dialog.winfo_screenwidth() // 2) - (500 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (600 // 2)
-        self.dialog.geometry(f"500x600+{x}+{y}")
+        y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
+        self.dialog.geometry(f"500x650+{x}+{y}")
 
         self.setup_dialog_ui(video_path, text_content, text_config)
 
@@ -515,52 +521,39 @@ class VideoConfigDialog:
 
         row = 0
 
-        # Video file selection
         ttk.Label(main_frame, text="Video File:").grid(row=row, column=0, sticky=tk.W, pady=(0, 10))
         self.video_var = tk.StringVar(value=video_path)
         video_frame = ttk.Frame(main_frame)
         video_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
         video_frame.columnconfigure(0, weight=1)
-
         ttk.Entry(video_frame, textvariable=self.video_var).grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
         ttk.Button(video_frame, text="Browse", command=self.browse_video).grid(row=0, column=1)
-
         row += 1
 
-        # Text content
         ttk.Label(main_frame, text="Text Overlay:").grid(row=row, column=0, sticky=tk.W, pady=(0, 10))
         self.text_var = tk.StringVar(value=text_content)
         ttk.Entry(main_frame, textvariable=self.text_var).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
-
         row += 1
 
-        # Text configuration
         config_frame = ttk.LabelFrame(main_frame, text="Text Configuration", padding="10")
         config_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 20))
         config_frame.columnconfigure(1, weight=1)
 
-        # Default values
         default_config = {
-            'fontsize': 50,
-            'color': 'white',
-            'movement': 'static',
-            'position': 'center',
-            'opacity': 0.8
+            'fontsize': 50, 'color': 'white', 'movement': 'static', 'opacity': 0.8,
+            'position': ('center', 'center')
         }
         if text_config:
             default_config.update(text_config)
 
-        # Font size
+        # Font size, Color, Opacity (bez zmian)
         ttk.Label(config_frame, text="Font Size:").grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
         self.fontsize_var = tk.IntVar(value=default_config['fontsize'])
-        fontsize_frame = ttk.Frame(config_frame)
-        fontsize_frame.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
-        ttk.Scale(fontsize_frame, from_=20, to=100, variable=self.fontsize_var, orient=tk.HORIZONTAL).pack(side=tk.LEFT,
-                                                                                                           fill=tk.X,
-                                                                                                           expand=True)
-        ttk.Label(fontsize_frame, textvariable=self.fontsize_var).pack(side=tk.RIGHT)
+        ttk.Scale(config_frame, from_=20, to=150, variable=self.fontsize_var, orient=tk.HORIZONTAL).grid(row=0,
+                                                                                                         column=1,
+                                                                                                         sticky=(tk.W,
+                                                                                                                 tk.E))
 
-        # Color
         ttk.Label(config_frame, text="Color:").grid(row=1, column=0, sticky=tk.W, pady=(0, 10))
         color_frame = ttk.Frame(config_frame)
         color_frame.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -568,101 +561,130 @@ class VideoConfigDialog:
         ttk.Entry(color_frame, textvariable=self.color_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         ttk.Button(color_frame, text="Choose", command=self.choose_color).pack(side=tk.RIGHT)
 
+        ttk.Label(config_frame, text="Opacity:").grid(row=2, column=0, sticky=tk.W, pady=(0, 10))
+        self.opacity_var = tk.DoubleVar(value=default_config['opacity'])
+        ttk.Scale(config_frame, from_=0.1, to=1.0, variable=self.opacity_var, orient=tk.HORIZONTAL).grid(row=2,
+                                                                                                         column=1,
+                                                                                                         sticky=(tk.W,
+                                                                                                                 tk.E))
+
         # Movement
-        ttk.Label(config_frame, text="Animation:").grid(row=2, column=0, sticky=tk.W, pady=(0, 10))
+        ttk.Label(config_frame, text="Animation:").grid(row=3, column=0, sticky=tk.W, pady=(0, 10))
         self.movement_var = tk.StringVar(value=default_config['movement'])
         movement_combo = ttk.Combobox(config_frame, textvariable=self.movement_var,
                                       values=['static', 'bounce', 'slide', 'float'], state='readonly')
-        movement_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
+        movement_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
+        movement_combo.bind("<<ComboboxSelected>>", self.toggle_position_controls)
 
-        # Position
-        ttk.Label(config_frame, text="Position:").grid(row=3, column=0, sticky=tk.W, pady=(0, 10))
-        self.position_var = tk.StringVar(value=default_config['position'])
-        position_combo = ttk.Combobox(config_frame, textvariable=self.position_var,
-                                      values=['center', 'top', 'bottom', 'left', 'right'], state='readonly')
-        position_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
+        # *** NOWA SEKCJA POZYCJI ***
+        ttk.Label(config_frame, text="Position:").grid(row=4, column=0, sticky=tk.W, pady=(0, 10))
+        position_frame = ttk.Frame(config_frame)
+        position_frame.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
 
-        # Opacity
-        ttk.Label(config_frame, text="Opacity:").grid(row=4, column=0, sticky=tk.W, pady=(0, 10))
-        self.opacity_var = tk.DoubleVar(value=default_config['opacity'])
-        opacity_frame = ttk.Frame(config_frame)
-        opacity_frame.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
-        ttk.Scale(opacity_frame, from_=0.1, to=1.0, variable=self.opacity_var, orient=tk.HORIZONTAL).pack(side=tk.LEFT,
-                                                                                                          fill=tk.X,
-                                                                                                          expand=True)
-        ttk.Label(opacity_frame, textvariable=self.opacity_var).pack(side=tk.RIGHT)
+        self.canvas_width = 320
+        self.canvas_height = 180
+        self.position_canvas = tk.Canvas(position_frame, width=self.canvas_width, height=self.canvas_height,
+                                         bg='#222222', cursor='crosshair')
+        self.position_canvas.pack()
+        self.position_canvas.bind("<Button-1>", self.on_canvas_click)
+
+        self.pos_label_var = tk.StringVar()
+        ttk.Label(position_frame, textvariable=self.pos_label_var).pack(pady=(5, 0))
+
+        # Inicjalizacja pozycji
+        self.selected_position = self._get_initial_pos_coords(default_config.get('position'))
+        self.update_canvas_marker(self.selected_position)
+        self.toggle_position_controls()  # Ustaw stan początkowy kontrolek
 
         row += 1
-
-        # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=row, column=0, columnspan=2, pady=(20, 0))
-
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
 
+    def toggle_position_controls(self, event=None):
+        if self.movement_var.get() == 'static':
+            self.position_canvas.config(state=tk.NORMAL, cursor='crosshair', bg='#222222')
+            self.update_canvas_marker(self.selected_position)
+        else:
+            self.position_canvas.config(state=tk.DISABLED, cursor='', bg='grey')
+            self.position_canvas.delete("marker")
+            animation_name = self.movement_var.get().capitalize()
+            self.pos_label_var.set(f"Position controlled by '{animation_name}' animation")
+
+    def _get_initial_pos_coords(self, position_val):
+        w, h = self.canvas_width, self.canvas_height
+        if isinstance(position_val, (tuple, list)) and len(position_val) == 2 and isinstance(position_val[0],
+                                                                                             (int, float)):
+            return position_val
+        # Domyślna pozycja na środku, jeśli wartość nie jest krotką współrzędnych
+        return (int(w / 2), int(h / 2))
+
+    def update_canvas_marker(self, pos, color='red'):
+        x, y = pos
+        self.position_canvas.delete("marker")
+        self.position_canvas.create_line(x - 8, y, x + 8, y, fill=color, tags="marker", width=2)
+        self.position_canvas.create_line(x, y - 8, x, y + 8, fill=color, tags="marker", width=2)
+        self.pos_label_var.set(f"Position: ({x}, {y})")
+
+    def on_canvas_click(self, event):
+        self.selected_position = (event.x, event.y)
+        self.update_canvas_marker(self.selected_position)
+
     def browse_video(self):
-        """Browse for video file"""
-        filename = filedialog.askopenfilename(
-            title="Select video file",
-            filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"), ("All files", "*.*")]
-        )
+        filename = filedialog.askopenfilename(title="Select video file",
+                                              filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"),
+                                                         ("All files", "*.*")])
         if filename:
             self.video_var.set(filename)
 
     def choose_color(self):
-        """Choose text color"""
         color = colorchooser.askcolor(title="Choose text color")
-        if color[1]:  # color[1] is the hex color
+        if color[1]:
             self.color_var.set(color[1])
 
     def ok_clicked(self):
-        """Handle OK button click"""
         video_path = self.video_var.get().strip()
         text_content = self.text_var.get().strip()
 
-        if not video_path:
-            messagebox.showerror("Error", "Please select a video file.")
+        if not video_path or not os.path.exists(video_path):
+            messagebox.showerror("Error", "Please select a valid video file.")
             return
         if not text_content:
             messagebox.showerror("Error", "Please enter text content.")
             return
-        if not os.path.exists(video_path):
-            messagebox.showerror("Error", "Video file does not exist.")
-            return
-
-        # Create text configuration
-        position = self.position_var.get()
-        if position == 'center':
-            position = ('center', 'center')
-        elif position == 'top':
-            position = ('center', 'top')
-        elif position == 'bottom':
-            position = ('center', 'bottom')
-        elif position == 'left':
-            position = ('left', 'center')
-        elif position == 'right':
-            position = ('right', 'center')
 
         text_config = {
             'fontsize': self.fontsize_var.get(),
             'color': self.color_var.get(),
             'movement': self.movement_var.get(),
-            'position': position,
-            'opacity': self.opacity_var.get()
+            'opacity': round(self.opacity_var.get(), 2),
         }
 
+        # Zapisz pozycję tylko dla tekstu statycznego
+        if text_config['movement'] == 'static':
+            text_config['position'] = self.selected_position
+        else:
+            # Dla animacji moviepy nie użyje tej wartości, ale ustawiamy ją na domyślną
+            text_config['position'] = ('center', 'center')
+
         self.result = (video_path, text_content, text_config)
-        print(f"Dialog result set: {self.result}")  # Debug print
         self.dialog.destroy()
 
     def cancel_clicked(self):
-        """Handle Cancel button click"""
         self.dialog.destroy()
 
 
 def main():
     root = tk.Tk()
+    # Dodanie motywu dla lepszego wyglądu
+    style = ttk.Style(root)
+    try:
+        # 'clam', 'alt', 'default', 'classic'
+        style.theme_use("clam")
+    except tk.TclError:
+        print("Motyw 'clam' nie jest dostępny, używam domyślnego.")
+
     app = VideoMergerGUI(root)
     root.mainloop()
 
