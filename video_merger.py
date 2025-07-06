@@ -1,9 +1,11 @@
 import os
+
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concatenate_videoclips, ImageClip
 import math
-
 import re
+import traceback
+
 
 class MoviePyProgressLogger:
     def __init__(self, callback):
@@ -20,20 +22,13 @@ class MoviePyProgressLogger:
                     self.callback(percentage=None, message=message)
 
     def iter_bar(self, **kwargs):
-        """
-        Obsługa paska postępu MoviePy, zgodna z API MoviePy 2.x.
-        """
         iterable = kwargs.get("t", kwargs.get("iterable", None))
-
         if iterable is None:
-            # Jeśli nie ma iterable, po prostu zwróć pusty iterator
             return iter([])
-
         try:
             total = len(iterable)
         except TypeError:
             total = None
-
         for i, item in enumerate(iterable):
             if self.callback and total:
                 percent = int((i / total) * 100)
@@ -43,47 +38,34 @@ class MoviePyProgressLogger:
 
 class VideoMerger:
     def __init__(self):
-        self.videos = []
-        self.text_configs = []
-        self.current_progress_callback = None  # Nowy atrybut do przechowywania callbacku postępu
+        self.clips_data = []
+        self.current_progress_callback = None
 
-    def add_video(self, video_path, text_content, text_config=None, duration=None):
-        default_config = {
-            'fontsize': 50,
-            'color': 'white',
-            'font': 'Arial-Bold',
-            'position': ('center', 'center'),
-            'duration': None,
-            'start_time': 0,
-            'movement': 'static',
-            'opacity': 0.8
-        }
-
-        if text_config:
-            default_config.update(text_config)
-
-        is_image = video_path.lower().endswith(('.jpg', '.jpeg', '.png'))
-
-        self.videos.append(video_path)
-        self.text_configs.append({
-            'text': text_content,
-            'config': default_config,
+    def add_clip(self, clip_path, texts_data, image_duration=None):
+        is_image = clip_path.lower().endswith(('.jpg', '.jpeg', '.png'))
+        self.clips_data.append({
+            'path': clip_path,
             'is_image': is_image,
-            'image_duration': duration if is_image else None
+            'image_duration': image_duration if is_image else None,
+            'texts': texts_data  # List of text configs
         })
 
-    def create_floating_text(self, text_content, config, clip_duration):
-        custom_duration = config.get('duration')
-        duration = custom_duration if custom_duration is not None else clip_duration
-        start_time = config.get('start_time', 0)
-        font = config.get('font', 'Arial-Bold')
+    def create_text_clip(self, text_content, config, clip_duration):
+        text_start = config.get('start_time', 0)
+        text_dur = config.get('duration')
+
+        # If duration is 0 or None, it means full length
+        duration = text_dur if text_dur else clip_duration
+
+        if text_start > clip_duration:
+            return None  # Text starts after the clip ends
 
         txt_clip = TextClip(
             text_content,
             fontsize=config.get('fontsize', 50),
             color=config.get('color', 'white'),
-            font=font
-        ).set_duration(duration).set_start(start_time)
+            font=config.get('font', 'Arial-Bold')
+        ).set_duration(duration).set_start(text_start)
 
         txt_clip = txt_clip.set_opacity(config.get('opacity', 0.8))
 
@@ -94,8 +76,14 @@ class VideoMerger:
             txt_clip = txt_clip.set_position(self._slide_position(duration))
         elif movement == 'float':
             txt_clip = txt_clip.set_position(self._float_position())
-        else:  # static or 'center'
-            txt_clip = txt_clip.set_position(config.get('position', ('center', 'center')))
+        else:  # static
+            pos = config.get('position', ('center', 'center'))
+            # Convert canvas coordinates to moviepy coordinates if they are absolute
+            if isinstance(pos, (list, tuple)) and all(isinstance(i, (int, float)) for i in pos):
+                # Assuming canvas size was 320x180 for position selection
+                # This might need adjustment if your final video size is known and different
+                pass  # Moviepy handles absolute pixel coords fine
+            txt_clip = txt_clip.set_position(pos)
 
         return txt_clip
 
@@ -103,81 +91,80 @@ class VideoMerger:
         return lambda t: ('center', 50 + 30 * abs(2 * (t % 2) - 1))
 
     def _slide_position(self, duration):
-        return lambda t: (50 + (t / duration) * 500, 'center')
+        # Slide across the width of the screen
+        return lambda t: ((t / duration) * (self.final_size[0] if hasattr(self, 'final_size') else 1920) - 100,
+                          'center')
 
     def _float_position(self):
         return lambda t: ('center', 100 + 50 * math.sin(2 * math.pi * t / 3))
 
-    def process_clip_with_text(self, clip_path, text_data):
-        """Process a single video or image clip, adding text if provided."""
+    def process_clip(self, clip_data):
         try:
-            clip = None
-            clip_duration = None
+            base_clip = None
+            clip_path = clip_data['path']
 
-            if text_data.get('is_image', False):
-                clip_duration = text_data.get('image_duration', 5)  # Default to 5 seconds for images
-                clip = ImageClip(clip_path).set_duration(clip_duration)
+            if clip_data['is_image']:
+                clip_duration = clip_data['image_duration']
+                base_clip = ImageClip(clip_path).set_duration(clip_duration)
             else:
-                clip = VideoFileClip(clip_path)
-                clip_duration = clip.duration
+                base_clip = VideoFileClip(clip_path)
+                clip_duration = base_clip.duration
 
-            text_content = text_data.get('text', '').strip()
+            # Set a standard size for all clips to avoid issues with concatenation
+            # Using the size of the first clip as the standard
+            if not hasattr(self, 'final_size') or self.final_size is None:
+                if base_clip.size is None:
+                    raise ValueError(f"Nie można odczytać rozmiaru klipu: {clip_path}")
+                self.final_size = base_clip.size
+            base_clip = base_clip.resize(self.final_size)
 
-            if not text_content:
-                return clip
+            text_clips = []
+            for text_info in clip_data['texts']:
+                text_content = text_info.get('text', '').strip()
+                if text_content:
+                    text_clip = self.create_text_clip(
+                        text_content,
+                        text_info['config'],
+                        clip_duration
+                    )
+                    if text_clip:
+                        text_clips.append(text_clip)
 
-            text_clip = self.create_floating_text(
-                text_content,
-                text_data['config'],
-                clip_duration
-            )
-            final_clip = CompositeVideoClip([clip, text_clip])
+            if not text_clips:
+                return base_clip
 
+            final_clip = CompositeVideoClip([base_clip] + text_clips)
             return final_clip
 
         except Exception as e:
-            print(f"Error in process_clip_with_text for {clip_path}: {str(e)}")
-            import traceback
+            print(f"Error in process_clip for {clip_data['path']}: {str(e)}")
             traceback.print_exc()
             raise
 
-    def _moviepy_progress_logger(self, message=None, **kwargs):
-        """
-        Niestandardowy logger dla MoviePy, który wywołuje callback postępu GUI.
-        """
-        if self.current_progress_callback:
-            match_percent = re.search(r'(\d+)%', message)
-            if match_percent:
-                percentage = int(match_percent.group(1))
-                self.current_progress_callback(percentage=percentage, message=f"Zapisywanie: {percentage}%")
-            else:
-                if "MoviePy - " not in message:
-                    self.current_progress_callback(percentage=None, message=message)
-
     def merge_videos(self, output_path, progress_callback=None):
-        self.current_progress_callback = progress_callback  # Zapisz callback na potrzeby loggera
+        self.current_progress_callback = progress_callback
+        self.final_size = None  # Reset final size for each merge
 
-        if not self.videos:
+        if not self.clips_data:
             return False, "No videos or images added to merge!"
 
         processed_clips = []
-        total_clips = len(self.videos)
+        total_clips = len(self.clips_data)
 
-        for i, (clip_path, text_data) in enumerate(zip(self.videos, self.text_configs)):
+        for i, clip_data in enumerate(self.clips_data):
             if self.current_progress_callback:
-                # To są wiadomości z naszej logiki, nie z MoviePy loggera
                 self.current_progress_callback(
-                    message=f"Przetwarzanie pliku {i + 1}/{total_clips}: {os.path.basename(clip_path)}")
+                    message=f"Przetwarzanie pliku {i + 1}/{total_clips}: {os.path.basename(clip_data['path'])}")
 
-            if not os.path.exists(clip_path):
-                print(f"ERROR: Clip file not found: {clip_path}")
+            if not os.path.exists(clip_data['path']):
+                print(f"ERROR: Clip file not found: {clip_data['path']}")
                 continue
 
             try:
-                processed_clip = self.process_clip_with_text(clip_path, text_data)
+                processed_clip = self.process_clip(clip_data)
                 processed_clips.append(processed_clip)
             except Exception as e:
-                print(f"ERROR processing clip {clip_path}: {str(e)}")
+                print(f"ERROR processing clip {clip_data['path']}: {str(e)}")
                 continue
 
         if not processed_clips:
@@ -187,9 +174,6 @@ class VideoMerger:
             if self.current_progress_callback:
                 self.current_progress_callback(message="Łączenie i konkatenacja klipów...")
 
-            # MoviePy może wydrukować logi podczas concatenate_videoclips.
-            # Jeśli chcemy przechwycić postęp z tego etapu, potrzebowalibyśmy bardziej złożonego systemu.
-            # Na razie skupiamy się na postępie write_videofile.
             final_video = concatenate_videoclips(processed_clips, method="compose")
 
             if self.current_progress_callback:
@@ -210,9 +194,9 @@ class VideoMerger:
             )
 
             for clip in processed_clips:
-                if clip:  # Upewnij się, że klip istnieje przed zamknięciem
+                if clip:
                     clip.close()
-            if final_video:  # Upewnij się, że final_video istnieje
+            if final_video:
                 final_video.close()
 
             print("Video merge completed successfully!")
@@ -220,6 +204,5 @@ class VideoMerger:
 
         except Exception as e:
             print(f"ERROR during video merging: {str(e)}")
-            import traceback
             traceback.print_exc()
             return False, f"Error during video merging: {str(e)}"

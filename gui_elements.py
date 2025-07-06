@@ -1,228 +1,339 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
+
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
+import copy
+
 
 class VideoConfigDialog:
-    def __init__(self, parent, title, video_path="", text_content="", text_config=None, is_image=False, image_duration=5):
+    def __init__(self, parent, title, video_path="", texts_data=None, is_image=False, image_duration=5):
+        self.parent = parent
         self.is_image = is_image
-        self.initial_image_duration = image_duration # Store initial value for image duration
+        self.image_duration = image_duration
+        self.texts_data = copy.deepcopy(texts_data) if texts_data is not None else []
         self.result = None
+        self.selected_text_id = None
+
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(title)
-        self.dialog.geometry("500x650")
+        self.dialog.geometry("800x700")
         self.dialog.transient(parent)
         self.dialog.grab_set()
-        self.dialog.update_idletasks()
-        x = (parent.winfo_rootx() + parent.winfo_width() // 2) - (self.dialog.winfo_width() // 2)
-        y = (parent.winfo_rooty() + parent.winfo_height() // 2) - (self.dialog.winfo_height() // 2)
-        self.dialog.geometry(f"+{x}+{y}")
 
-        # Initialize duration widgets to None
-        self.duration_label = None
-        self.duration_scale = None
-        self.duration_var = tk.IntVar(value=self.initial_image_duration) # Always create var
+        self.setup_dialog_ui(video_path)
+        self.populate_texts_tree()
+        self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
+        self.toggle_config_controls_state()
 
-        self.setup_dialog_ui(video_path, text_content, text_config)
-
-    def update_scale_value(self, value, label_widget, decimals=0):
-        """Update the label next to a scale with the current value"""
-        try:
-            if decimals == 0:
-                display_value = int(float(value))
-                label_widget.config(text=str(display_value))
-            else:
-                display_value = round(float(value), decimals)
-                label_widget.config(text=f"{display_value:.{decimals}f}")
-        except ValueError:
-            pass
-
-    def setup_dialog_ui(self, video_path, text_content, text_config):
-        main_frame = ttk.Frame(self.dialog, padding="20")
+    def setup_dialog_ui(self, video_path):
+        main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(1, weight=3)  # Give more space to config frame
+        main_frame.rowconfigure(1, weight=1)
 
-        # Video/Image File
-        ttk.Label(main_frame, text="File:").grid(row=0, column=0, sticky=tk.W, pady=(0, 10))
+        # --- Left Panel: File and Texts List ---
+        left_panel = ttk.Frame(main_frame, padding="10")
+        left_panel.grid(row=0, column=0, rowspan=2, sticky="nswe", padx=(0, 10))
+        left_panel.rowconfigure(3, weight=1)
+
+        ttk.Label(left_panel, text="File:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
         self.video_var = tk.StringVar(value=video_path)
-        video_frame = ttk.Frame(main_frame)
-        video_frame.grid(row=0, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
-        video_frame.columnconfigure(0, weight=1)
-        ttk.Entry(video_frame, textvariable=self.video_var).grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
-        ttk.Button(video_frame, text="Browse", command=self.browse_file).grid(row=0, column=1)
+        ttk.Entry(left_panel, textvariable=self.video_var, state='readonly').grid(row=1, column=0, sticky="ew",
+                                                                                  pady=(0, 10))
 
-        # Text Overlay
-        ttk.Label(main_frame, text="Text Overlay:").grid(row=1, column=0, sticky=tk.W, pady=(0, 10))
-        self.text_var = tk.StringVar(value=text_content)
-        self.text_entry = ttk.Entry(main_frame, textvariable=self.text_var)
-        self.text_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(0, 10))
-        self.text_entry.bind("<KeyRelease>", self.toggle_position_controls)
+        ttk.Label(left_panel, text="Text Overlays:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W,
+                                                                                      pady=(0, 5))
+        self.setup_texts_tree(left_panel)
+        self.setup_text_buttons(left_panel)
 
-
-        # Config Frame
-        # Name the config_frame so we can reference it later
-        self.config_frame = ttk.LabelFrame(main_frame, text="Text Configuration", padding="10", name="config_frame")
-        self.config_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 20))
+        # --- Right Panel: Configuration ---
+        self.config_frame = ttk.LabelFrame(main_frame, text="Text Configuration (select a text to edit)", padding="15")
+        self.config_frame.grid(row=0, column=1, rowspan=2, sticky="nswe")
         self.config_frame.columnconfigure(1, weight=1)
+        self.setup_config_controls(self.config_frame)
 
-        default_config = {'fontsize': 50, 'color': 'white', 'movement': 'static', 'opacity': 0.8,
-                          'position': ('center', 'center')}
-        if text_config: default_config.update(text_config)
-
-        # Config Controls
-        self.setup_config_controls(self.config_frame, default_config)
-
-        # OK/Cancel Buttons
+        # --- Bottom Buttons ---
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
 
-        # Initial call to set correct state
-        self.update_duration_visibility() # Call this first to ensure correct initial state
-        self.toggle_position_controls()
+    def setup_texts_tree(self, parent):
+        tree_frame = ttk.Frame(parent)
+        tree_frame.grid(row=3, column=0, sticky='nswe')
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
 
-    def setup_config_controls(self, parent_frame, config):
-        row_idx = 0
+        columns = ('#', 'Text', 'Time')
+        self.texts_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=10)
+        self.texts_tree.heading('#', text='#', anchor='w')
+        self.texts_tree.heading('Text', text='Text Content')
+        self.texts_tree.heading('Time', text='Timing (s)')
+        self.texts_tree.column('#', width=30, stretch=tk.NO, anchor='w')
+        self.texts_tree.column('Text', width=120)
+        self.texts_tree.column('Time', width=80)
+        self.texts_tree.grid(row=0, column=0, sticky='nswe')
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.texts_tree.yview)
+        self.texts_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.grid(row=0, column=1, sticky='ns')
+
+        self.texts_tree.bind('<<TreeviewSelect>>', self.on_text_selected)
+
+    def setup_text_buttons(self, parent):
+        button_frame = ttk.Frame(parent)
+        button_frame.grid(row=4, column=0, pady=(10, 0))
+        ttk.Button(button_frame, text="Add", command=self.add_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Remove", command=self.remove_text).pack(side=tk.LEFT, padx=5)
+
+    def setup_config_controls(self, parent_frame):
+        row = 0
+        # Text Content
+        ttk.Label(parent_frame, text="Text:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.text_var = tk.StringVar()
+        self.text_entry = ttk.Entry(parent_frame, textvariable=self.text_var)
+        self.text_entry.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+        self.text_entry.bind("<KeyRelease>", self.update_selected_text_data)
+        row += 1
 
         # Font Size
-        ttk.Label(parent_frame, text="Font Size:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
-        self.fontsize_var = tk.IntVar(value=config['fontsize'])
-        self.fontsize_value = ttk.Label(parent_frame, text=str(self.fontsize_var.get()))
-        self.fontsize_value.grid(row=row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
-
-        fontsize_scale = ttk.Scale(parent_frame, from_=20, to=150, variable=self.fontsize_var,
-                                   orient=tk.HORIZONTAL,
-                                   command=lambda v: self.update_scale_value(v, self.fontsize_value))
-        fontsize_scale.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
-        row_idx += 1
+        ttk.Label(parent_frame, text="Font Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.fontsize_var = tk.IntVar(value=50)
+        scale = ttk.Scale(parent_frame, from_=10, to=200, variable=self.fontsize_var, orient=tk.HORIZONTAL,
+                          command=self.update_selected_text_data)
+        scale.grid(row=row, column=1, sticky="ew", pady=5)
+        ttk.Label(parent_frame, textvariable=self.fontsize_var).grid(row=row, column=2, padx=5)
+        row += 1
 
         # Color
-        ttk.Label(parent_frame, text="Color:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
-        color_frame = ttk.Frame(parent_frame)
-        color_frame.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
-        self.color_var = tk.StringVar(value=config['color'])
-        ttk.Entry(color_frame, textvariable=self.color_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        ttk.Button(color_frame, text="Choose", command=self.choose_color).pack(side=tk.RIGHT)
-        row_idx += 1
+        ttk.Label(parent_frame, text="Color:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.color_var = tk.StringVar(value='white')
+        color_entry = ttk.Entry(parent_frame, textvariable=self.color_var)
+        color_entry.grid(row=row, column=1, sticky="ew")
+        color_entry.bind("<KeyRelease>", self.update_selected_text_data)
+        ttk.Button(parent_frame, text="Choose", command=self.choose_color).grid(row=row, column=2, padx=5)
+        row += 1
 
         # Opacity
-        ttk.Label(parent_frame, text="Opacity:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
-        self.opacity_var = tk.DoubleVar(value=config['opacity'])
-        self.opacity_value = ttk.Label(parent_frame, text=f"{self.opacity_var.get():.1f}")
-        self.opacity_value.grid(row=row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
+        ttk.Label(parent_frame, text="Opacity:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.opacity_var = tk.DoubleVar(value=0.8)
+        scale = ttk.Scale(parent_frame, from_=0.0, to=1.0, variable=self.opacity_var, orient=tk.HORIZONTAL,
+                          command=self.update_selected_text_data)
+        scale.grid(row=row, column=1, sticky="ew", pady=5)
+        self.opacity_label = ttk.Label(parent_frame, text="0.8")
+        self.opacity_label.grid(row=row, column=2, padx=5)
+        row += 1
 
-        opacity_scale = ttk.Scale(parent_frame, from_=0.1, to=1.0, variable=self.opacity_var,
-                                  orient=tk.HORIZONTAL,
-                                  command=lambda v: self.update_scale_value(v, self.opacity_value, 1))
-        opacity_scale.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
-        row_idx += 1
+        # Timing
+        timing_frame = ttk.LabelFrame(parent_frame, text="Timing", padding=10)
+        timing_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=10)
+        timing_frame.columnconfigure(1, weight=1)
+        timing_frame.columnconfigure(3, weight=1)
 
-        # Placeholder for image duration
-        self.duration_row_idx = row_idx
-        row_idx += 1
+        ttk.Label(timing_frame, text="Start (s):").grid(row=0, column=0, padx=5)
+        self.start_time_var = tk.DoubleVar(value=0)
+        start_spin = ttk.Spinbox(timing_frame, from_=0, to=9999, increment=0.1, textvariable=self.start_time_var,
+                                 command=self.update_selected_text_data, width=8)
+        start_spin.grid(row=0, column=1, sticky="ew")
+        start_spin.bind("<KeyRelease>", self.update_selected_text_data)
+
+        ttk.Label(timing_frame, text="Duration (s):").grid(row=0, column=2, padx=5)
+        self.duration_var = tk.DoubleVar(value=0)
+        dur_spin = ttk.Spinbox(timing_frame, from_=0, to=9999, increment=0.1, textvariable=self.duration_var,
+                               command=self.update_selected_text_data, width=8)
+        dur_spin.grid(row=0, column=3, sticky="ew")
+        dur_spin.bind("<KeyRelease>", self.update_selected_text_data)
+        ttk.Label(timing_frame, text="(0=full clip)").grid(row=1, column=2, columnspan=2, sticky='w', padx=5)
+        row += 1
 
         # Movement
-        ttk.Label(parent_frame, text="Animation:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
-        self.movement_var = tk.StringVar(value=config['movement'])
+        ttk.Label(parent_frame, text="Animation:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.movement_var = tk.StringVar(value='static')
         self.movement_combo = ttk.Combobox(parent_frame, textvariable=self.movement_var,
                                            values=['static', 'bounce', 'slide', 'float'], state='readonly')
-        self.movement_combo.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
-        self.movement_combo.bind("<<ComboboxSelected>>", self.toggle_position_controls)
-        row_idx += 1
+        self.movement_combo.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+        self.movement_combo.bind("<<ComboboxSelected>>", self.update_selected_text_data)
+        row += 1
 
-        # Position Canvas
-        ttk.Label(parent_frame, text="Position:").grid(row=row_idx, column=0, sticky=tk.W, pady=5)
-        position_frame = ttk.Frame(parent_frame)
-        position_frame.grid(row=row_idx, column=1, sticky=(tk.W, tk.E), pady=5)
+        # Position
+        ttk.Label(parent_frame, text="Position:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.canvas_width, self.canvas_height = 320, 180
-        self.position_canvas = tk.Canvas(position_frame, width=self.canvas_width, height=self.canvas_height,
-                                         bg='#222222', cursor='crosshair')
-        self.position_canvas.pack()
+        self.position_canvas = tk.Canvas(parent_frame, width=self.canvas_width, height=self.canvas_height, bg='#222222',
+                                         cursor='crosshair')
+        self.position_canvas.grid(row=row, column=1, columnspan=2, pady=5)
         self.position_canvas.bind("<Button-1>", self.on_canvas_click)
-        self.pos_label_var = tk.StringVar()
-        self.pos_label = ttk.Label(position_frame, textvariable=self.pos_label_var)
-        self.pos_label.pack(pady=(5, 0))
+        self.pos_label_var = tk.StringVar(value="Select position for 'static' animation")
+        ttk.Label(parent_frame, textvariable=self.pos_label_var).grid(row=row + 1, column=1, columnspan=2)
 
-        self.selected_position = self._get_initial_pos_coords(config.get('position'))
-        self.update_canvas_marker(self.selected_position)
-
-    def toggle_position_controls(self, event=None):
-        is_static = self.movement_var.get() == 'static'
-        has_text = self.text_var.get().strip() != ""
-
-        if is_static and has_text:
-            self.position_canvas.config(state=tk.NORMAL, cursor='crosshair', bg='#222222')
-            self.position_canvas.bind("<Button-1>", self.on_canvas_click)
-            self.update_canvas_marker(self.selected_position)
-        else:
-            self.position_canvas.config(state=tk.DISABLED, cursor='', bg='grey')
-            self.position_canvas.delete("marker")
-            self.position_canvas.unbind("<Button-1>") # Disable click
-            if not has_text:
-                self.pos_label_var.set("Add text to enable position controls")
-            elif not is_static:
-                anim_name = self.movement_var.get().capitalize()
-                self.pos_label_var.set(f"Position controlled by '{anim_name}' animation")
-
-
-    def _get_initial_pos_coords(self, position_val):
-        if isinstance(position_val, (tuple, list)) and len(position_val) == 2 and isinstance(position_val[0], (int, float)):
-            return position_val
-        return (int(self.canvas_width / 2), int(self.canvas_height / 2))
-
-    def update_canvas_marker(self, pos, color='red'):
-        x, y = pos
-        self.position_canvas.delete("marker")
-        self.position_canvas.create_line(x - 8, y, x + 8, y, fill=color, tags="marker", width=2)
-        self.position_canvas.create_line(x, y - 8, x, y + 8, fill=color, tags="marker", width=2)
-        self.pos_label_var.set(f"Position: ({x}, {y})")
-
-    def on_canvas_click(self, event):
-        # Ensure click is within canvas bounds
-        x = max(0, min(event.x, self.canvas_width))
-        y = max(0, min(event.y, self.canvas_height))
-        self.selected_position = (x, y)
-        self.update_canvas_marker(self.selected_position)
-
-    def browse_file(self):
-        filename = filedialog.askopenfilename(title="Select video or image file",
-                                              filetypes=[("Video files", "*.mp4 *.avi *.mov *.mkv"),
-                                                         ("Image files", "*.jpg *.jpeg *.png"),
-                                                         ("All files", "*.*")])
-        if filename:
-            self.video_var.set(filename)
-            # Update is_image and toggle duration controls
-            self.is_image = filename.lower().endswith(('.jpg', '.jpeg', '.png'))
-            self.update_duration_visibility()
-
-    def update_duration_visibility(self):
-        # Dynamically add/remove duration controls based on self.is_image
+        # Image Duration (only visible if it's an image)
         if self.is_image:
-            # Create widgets if they don't exist
-            if self.duration_label is None:
-                self.duration_label = ttk.Label(self.config_frame, text="Duration (seconds):")
-                self.duration_var = tk.IntVar(value=self.initial_image_duration)
-                self.duration_value = ttk.Label(self.config_frame, text=str(self.duration_var.get()))
-                self.duration_scale = ttk.Scale(self.config_frame, from_=1, to=30, variable=self.duration_var,
-                                                orient=tk.HORIZONTAL,
-                                                command=lambda v: self.update_scale_value(v, self.duration_value))
+            img_dur_frame = ttk.LabelFrame(self.config_frame, text="Image Settings", padding=10)
+            img_dur_frame.grid(row=row + 2, column=0, columnspan=3, sticky='ew', pady=(20, 0))
+            ttk.Label(img_dur_frame, text="Image Duration (s):").pack(side=tk.LEFT, padx=5)
+            self.image_duration_var = tk.IntVar(value=self.image_duration)
+            ttk.Spinbox(img_dur_frame, from_=1, to=300, textvariable=self.image_duration_var).pack(side=tk.LEFT)
 
-            # Place them in the correct grid positions
-            self.duration_label.grid(row=self.duration_row_idx, column=0, sticky=tk.W, pady=5)
-            self.duration_scale.grid(row=self.duration_row_idx, column=1, sticky=(tk.W, tk.E))
-            self.duration_value.grid(row=self.duration_row_idx, column=2, sticky=tk.W, padx=(10, 0), pady=5)
-        else:
-            # Hide/destroy if not an image
-            if self.duration_label is not None:
-                self.duration_label.grid_forget()
-                self.duration_scale.grid_forget()
-                if hasattr(self, 'duration_value'):
-                    self.duration_value.grid_forget()
+    def populate_texts_tree(self):
+        for item in self.texts_tree.get_children():
+            self.texts_tree.delete(item)
+        for i, text_data in enumerate(self.texts_data):
+            text_content = text_data.get('text', 'No Text')
+            start = text_data['config'].get('start_time', 0)
+            dur = text_data['config'].get('duration', 0)
+            timing_str = f"{start} - {start + dur if dur > 0 else 'end'}"
+            self.texts_tree.insert('', 'end', iid=i, values=(i + 1, text_content, timing_str))
+
+    # *** FIX: Restored the missing on_text_selected method ***
+    def on_text_selected(self, event=None):
+        selection = self.texts_tree.selection()
+        if not selection:
+            self.selected_text_id = None
+            self.toggle_config_controls_state(disabled=True)
+            return
+
+        # The 'iid' of the selected item is its index in the list
+        self.selected_text_id = int(selection[0])
+
+        self.toggle_config_controls_state(disabled=False)
+        self.load_config_for_selected_text()
+
+    def load_config_for_selected_text(self):
+        if self.selected_text_id is None or self.selected_text_id >= len(self.texts_data):
+            return
+
+        data = self.texts_data[self.selected_text_id]
+        config = data.get('config', {})
+
+        self.text_var.set(data.get('text', ''))
+        self.fontsize_var.set(config.get('fontsize', 50))
+        self.color_var.set(config.get('color', 'white'))
+        self.opacity_var.set(config.get('opacity', 0.8))
+        self.opacity_label.config(text=f"{self.opacity_var.get():.1f}")
+        self.start_time_var.set(config.get('start_time', 0))
+        self.duration_var.set(config.get('duration', 0))
+        self.movement_var.set(config.get('movement', 'static'))
+
+        self.update_canvas(config.get('position'), config.get('movement'))
+
+    def update_selected_text_data(self, event=None):
+        if self.selected_text_id is None or self.selected_text_id >= len(self.texts_data):
+            return
+
+        try:
+            start_time = self.start_time_var.get()
+            duration = self.duration_var.get()
+        except tk.TclError:
+            return
+
+        new_config = {
+            'fontsize': self.fontsize_var.get(),
+            'color': self.color_var.get(),
+            'movement': self.movement_var.get(),
+            'opacity': round(self.opacity_var.get(), 2),
+            'start_time': start_time,
+            'duration': duration,
+            'position': self.texts_data[self.selected_text_id]['config'].get('position')
+        }
+
+        self.texts_data[self.selected_text_id]['text'] = self.text_var.get()
+        self.texts_data[self.selected_text_id]['config'] = new_config
+
+        self.opacity_label.config(text=f"{new_config['opacity']:.1f}")
+        self.update_canvas(new_config['position'], new_config['movement'])
+        self.populate_texts_tree()
+
+        if self.texts_tree.exists(str(self.selected_text_id)):
+            self.texts_tree.selection_set(str(self.selected_text_id))
+
+    def add_text(self):
+        center_pos = (self.canvas_width / 2, self.canvas_height / 2)
+        new_text_data = {
+            'text': 'New Text',
+            'config': {
+                'fontsize': 50, 'color': 'white', 'movement': 'static',
+                'opacity': 0.8, 'position': center_pos,
+                'start_time': 0, 'duration': 5, 'font': 'Arial-Bold'
+            }
+        }
+        self.texts_data.append(new_text_data)
+        self.populate_texts_tree()
+        new_id = len(self.texts_data) - 1
+        self.texts_tree.selection_set(new_id)
+        self.texts_tree.focus(new_id)
+
+    def remove_text(self):
+        if self.selected_text_id is None:
+            messagebox.showwarning("Warning", "Please select a text to remove.", parent=self.dialog)
+            return
+
+        self.texts_data.pop(self.selected_text_id)
+        self.selected_text_id = None
+        self.populate_texts_tree()
+        self.toggle_config_controls_state(disabled=True)
 
     def choose_color(self):
-        color = colorchooser.askcolor(title="Choose text color")
-        if color and color[1]: self.color_var.set(color[1])
+        if self.selected_text_id is None: return
+        color_code = colorchooser.askcolor(title="Choose color", parent=self.dialog)
+        if color_code and color_code[1]:
+            self.color_var.set(color_code[1])
+            self.update_selected_text_data()
+
+    def on_canvas_click(self, event):
+        if self.selected_text_id is None or self.movement_var.get() != 'static': return
+        x = max(0, min(event.x, self.canvas_width))
+        y = max(0, min(event.y, self.canvas_height))
+
+        self.texts_data[self.selected_text_id]['config']['position'] = (x, y)
+        self.update_canvas((x, y), 'static')
+
+    def update_canvas(self, pos, movement):
+        self.position_canvas.delete("marker")
+        if movement == 'static':
+            self.position_canvas.config(state=tk.NORMAL, cursor='crosshair', bg='#222222')
+            if pos and isinstance(pos, (tuple, list)):
+                x_val, y_val = pos
+
+                x = self.canvas_width / 2 if x_val == 'center' else x_val
+                y = self.canvas_height / 2 if y_val == 'center' else y_val
+
+                if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                    self.position_canvas.create_line(x - 8, y, x + 8, y, fill='red', tags="marker", width=2)
+                    self.position_canvas.create_line(x, y - 8, x, y + 8, fill='red', tags="marker", width=2)
+                    self.pos_label_var.set(f"Position: ({int(x)}, {int(y)})")
+                else:
+                    self.pos_label_var.set("Click to set position")
+            else:
+                self.pos_label_var.set("Click to set position")
+        else:
+            self.position_canvas.config(state=tk.DISABLED, cursor='', bg='grey')
+            anim_name = movement.capitalize()
+            self.pos_label_var.set(f"Position controlled by '{anim_name}'")
+
+    def toggle_config_controls_state(self, disabled=True):
+        state = tk.DISABLED if disabled else tk.NORMAL
+        for child in self.config_frame.winfo_children():
+            if isinstance(child, (ttk.LabelFrame)):
+                for sub_child in child.winfo_children():
+                    try:
+                        sub_child.configure(state=state)
+                    except tk.TclError:
+                        pass
+            else:
+                try:
+                    child.configure(state=state)
+                except tk.TclError:
+                    pass
+
+        if disabled or self.movement_var.get() != 'static':
+            self.position_canvas.config(state=tk.DISABLED, bg='grey')
+        else:
+            self.position_canvas.config(state=tk.NORMAL, bg='#222222')
+
+        if disabled:
+            self.config_frame.config(text="Text Configuration (select a text to edit)")
+        elif self.selected_text_id is not None:
+            self.config_frame.config(text=f"Editing Text #{self.selected_text_id + 1}")
 
     def ok_clicked(self):
         video_path = self.video_var.get().strip()
@@ -230,21 +341,13 @@ class VideoConfigDialog:
             messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
             return
 
-        text_content = self.text_var.get().strip()
-        text_config = {
-            'fontsize': self.fontsize_var.get(),
-            'color': self.color_var.get(),
-            'movement': self.movement_var.get(),
-            'opacity': round(self.opacity_var.get(), 2),
-            'position': self.selected_position if self.movement_var.get() == 'static' else ('center', 'center')
-        }
-
         if self.is_image:
-            duration = self.duration_var.get()
-            self.result = (video_path, text_content, text_config, duration)
+            duration = self.image_duration_var.get()
+            self.result = (video_path, self.texts_data, duration)
         else:
-            self.result = (video_path, text_content, text_config)
+            self.result = (video_path, self.texts_data, None)
         self.dialog.destroy()
 
     def cancel_clicked(self):
+        self.result = None
         self.dialog.destroy()

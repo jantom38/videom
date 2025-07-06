@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
+
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import threading
 from video_merger import VideoMerger
@@ -32,25 +33,19 @@ class VideoMergerGUI:
         self.setup_progress_area(main_frame)
 
     def setup_video_list(self, parent):
-        list_label = ttk.Label(parent, text="Video/Image List:", font=('Arial', 12, 'bold'))
+        list_label = ttk.Label(parent, text="Clip Order:", font=('Arial', 12, 'bold'))
         list_label.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(0, 10))
 
-        columns = ('Order', 'File', 'Text Overlay', 'Animation', 'Position', 'Color')
+        columns = ('Order', 'File', 'Text Overlays')
         self.tree = ttk.Treeview(parent, columns=columns, show='headings', height=10)
 
         self.tree.heading('Order', text='#')
         self.tree.heading('File', text='File')
-        self.tree.heading('Text Overlay', text='Text Overlay')
-        self.tree.heading('Animation', text='Animation')
-        self.tree.heading('Position', text='Position')
-        self.tree.heading('Color', text='Color')
+        self.tree.heading('Text Overlays', text='Text Overlays')
 
-        self.tree.column('Order', width=40, anchor='center')
-        self.tree.column('File', width=200)
-        self.tree.column('Text Overlay', width=150)
-        self.tree.column('Animation', width=100)
-        self.tree.column('Position', width=100, anchor='center')
-        self.tree.column('Color', width=80)
+        self.tree.column('Order', width=50, anchor='center', stretch=tk.NO)
+        self.tree.column('File', width=400)
+        self.tree.column('Text Overlays', width=150, anchor='center')
 
         scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -87,7 +82,7 @@ class VideoMergerGUI:
         progress_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E))
         progress_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate', maximum=100)  # Zmieniono na determinate
+        self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate', maximum=100)
         self.progress_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         self.status_var = tk.StringVar(value="Ready")
         ttk.Label(progress_frame, textvariable=self.status_var).grid(row=1, column=0, sticky=tk.W)
@@ -97,23 +92,18 @@ class VideoMergerGUI:
             title="Wybierz plik wideo lub obraz",
             filetypes=[("Video/Image", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png")]
         )
+        if not path:
+            return
 
-        if path:
-            is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
-            dialog = VideoConfigDialog(self.root, "Dodaj plik", video_path=path, is_image=is_image)
+        is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
+        dialog = VideoConfigDialog(self.root, "Add/Edit Text on Clip", video_path=path, texts_data=[],
+                                   is_image=is_image)
+        self.root.wait_window(dialog.dialog)
 
-            # Czekamy na zamknięcie okna dialogowego
-            self.root.wait_window(dialog.dialog)
-
-            if dialog.result:
-                if len(dialog.result) == 4:
-                    path, text, config, duration = dialog.result
-                    self.merger.add_video(path, text, config, duration=duration)
-                else:
-                    path, text, config = dialog.result
-                    self.merger.add_video(path, text, config)
-
-                self.update_file_list()
+        if dialog.result:
+            path, texts_data, duration = dialog.result
+            self.merger.add_clip(path, texts_data, image_duration=duration)
+            self.update_file_list()
 
     def edit_file_dialog(self):
         selection = self.tree.selection()
@@ -123,30 +113,21 @@ class VideoMergerGUI:
 
         item = selection[0]
         index = self.tree.index(item)
-        current_file_path = self.merger.videos[index]
-        current_text_data = self.merger.text_configs[index]
-        is_image = current_text_data.get('is_image', False)
-        image_duration = current_text_data.get('image_duration', 5)
 
-        dialog = VideoConfigDialog(self.root, "Edit Video/Image",
-                                   video_path=current_file_path,
-                                   text_content=current_text_data['text'],
-                                   text_config=current_text_data['config'],
-                                   is_image=is_image,
-                                   image_duration=image_duration)
+        clip_data = self.merger.clips_data[index]
+
+        dialog = VideoConfigDialog(self.root, "Add/Edit Text on Clip",
+                                   video_path=clip_data['path'],
+                                   texts_data=clip_data['texts'],
+                                   is_image=clip_data['is_image'],
+                                   image_duration=clip_data.get('image_duration', 5))
         self.root.wait_window(dialog.dialog)
 
         if dialog.result:
-            file_path, text_content, new_text_config = dialog.result[0:3]
-            new_image_duration = dialog.result[3] if len(dialog.result) == 4 else None
-
-            # Update existing configuration
-            current_text_data['config'].update(new_text_config)
-            current_text_data['text'] = text_content
-            current_text_data['is_image'] = file_path.lower().endswith(('.jpg', '.jpeg', '.png'))
-            current_text_data['image_duration'] = new_image_duration if current_text_data['is_image'] else None
-            self.merger.videos[index] = file_path  # Update path in case it changed
-
+            path, new_texts_data, new_duration = dialog.result
+            clip_data['texts'] = new_texts_data
+            if clip_data['is_image']:
+                clip_data['image_duration'] = new_duration
             self.update_file_list()
 
     def remove_file(self):
@@ -157,8 +138,7 @@ class VideoMergerGUI:
 
         indices = sorted([self.tree.index(item) for item in selection], reverse=True)
         for index in indices:
-            self.merger.videos.pop(index)
-            self.merger.text_configs.pop(index)
+            self.merger.clips_data.pop(index)
         self.update_file_list()
 
     def move_file_up(self):
@@ -167,8 +147,7 @@ class VideoMergerGUI:
         for item in selection:
             index = self.tree.index(item)
             if index > 0:
-                self.merger.videos.insert(index - 1, self.merger.videos.pop(index))
-                self.merger.text_configs.insert(index - 1, self.merger.text_configs.pop(index))
+                self.merger.clips_data.insert(index - 1, self.merger.clips_data.pop(index))
         self.update_file_list()
 
     def move_file_down(self):
@@ -176,45 +155,33 @@ class VideoMergerGUI:
         if not selection: return
         for item in reversed(selection):
             index = self.tree.index(item)
-            if index < len(self.merger.videos) - 1:
-                self.merger.videos.insert(index + 1, self.merger.videos.pop(index))
-                self.merger.text_configs.insert(index + 1, self.merger.text_configs.pop(index))
+            if index < len(self.merger.clips_data) - 1:
+                self.merger.clips_data.insert(index + 1, self.merger.clips_data.pop(index))
         self.update_file_list()
 
     def clear_all_files(self):
-        if self.merger.videos and messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all files?"):
-            self.merger.videos.clear()
-            self.merger.text_configs.clear()
+        if self.merger.clips_data and messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all files?"):
+            self.merger.clips_data.clear()
             self.update_file_list()
 
     def update_file_list(self):
+        # Deselect to avoid issues
+        self.tree.selection_remove(self.tree.selection())
+
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        for i, (file_path, text_data) in enumerate(zip(self.merger.videos, self.merger.text_configs)):
-            filename = os.path.basename(file_path)
-            config = text_data.get('config', {})
-            text_content = text_data.get('text', '').strip() or "-"
-            animation = config.get('movement', 'static')
-            color = config.get('color', 'white')
+        for i, clip_data in enumerate(self.merger.clips_data):
+            filename = os.path.basename(clip_data['path'])
 
-            if text_data.get('is_image', False):
-                duration = text_data.get('image_duration', 5)
+            if clip_data['is_image']:
+                duration = clip_data.get('image_duration', 5)
                 filename = f"{filename} ({duration}s)"
 
-            position = config.get('position', '-')
-            pos_display = "-"
-            if text_content != "-":  # Only show position if there's text
-                if animation == 'static':
-                    if isinstance(position, (tuple, list)) and len(position) > 1 and isinstance(position[0],
-                                                                                                (int, float)):
-                        pos_display = f"({int(position[0])}, {int(position[1])})"
-                    else:
-                        pos_display = str(position)
-                else:
-                    pos_display = "Auto"
+            num_texts = len(clip_data.get('texts', []))
+            text_display = f"{num_texts} overlay(s)" if num_texts > 0 else "No text"
 
-            self.tree.insert('', 'end', values=(i + 1, filename, text_content, animation, pos_display, color))
+            self.tree.insert('', 'end', values=(i + 1, filename, text_display))
 
     def browse_output_file(self):
         filename = filedialog.asksaveasfilename(
@@ -224,51 +191,44 @@ class VideoMergerGUI:
         if filename: self.output_var.set(filename)
 
     def start_merge_process(self):
-        if not self.merger.videos:
+        if not self.merger.clips_data:
             messagebox.showwarning("No Files", "Please add at least one video or image to merge.")
             return
         if not self.output_var.get():
             messagebox.showwarning("No Output File", "Please specify an output file.")
             return
 
-        # Reset progress bar and status before starting
-        self.progress_bar.stop()  # Stop if it was already running as indeterminate
-        self.progress_bar['value'] = 0  # Reset value
-        self.progress_bar['mode'] = 'determinate'  # Set mode
+        self.progress_bar['value'] = 0
+        self.progress_bar['mode'] = 'determinate'
         self.status_var.set("Processing...")
 
-        # Pass a lambda that calls the GUI's update_progress method
         thread = threading.Thread(target=self.merge_files_thread, args=(self.output_var.get(), self.update_progress),
                                   daemon=True)
         thread.start()
 
     def update_progress(self, percentage=None, message=""):
-        """
-        Aktualizuje pasek postępu i status w GUI.
-        Wywoływana z wątku MoviePy (przez MoviePy's logger).
-        """
         self.root.after(0, lambda: self._actual_update_progress(percentage, message))
 
     def _actual_update_progress(self, percentage, message):
-        """Metoda wykonywana w głównym wątku Tkinter."""
         if percentage is not None:
+            if self.progress_bar['mode'] == 'indeterminate':
+                self.progress_bar.stop()
+                self.progress_bar['mode'] = 'determinate'
             self.progress_bar['value'] = percentage
-            self.status_var.set(f"{message}")
         else:
-            # Jeśli nie ma procentu, aktualizujemy tylko wiadomość statusu
-            self.status_var.set(message)
-            self.progress_bar['mode'] = 'indeterminate'  # Przełącz na indeterminate, jeśli brak procentów
-            self.progress_bar.start()  # Uruchom, jeśli był zatrzymany
+            if self.progress_bar['mode'] == 'determinate':
+                self.progress_bar['mode'] = 'indeterminate'
+                self.progress_bar.start()
+        self.status_var.set(message)
 
     def merge_files_thread(self, output_path, progress_callback):
-        # Przekazujemy progres callback bezpośrednio do VideoMerger
         success, message = self.merger.merge_videos(output_path, progress_callback)
         self.root.after(0, lambda: self.merge_complete(success, message))
 
     def merge_complete(self, success, message):
         self.progress_bar.stop()
-        self.progress_bar['value'] = 0  # Reset progress bar value
-        self.progress_bar['mode'] = 'indeterminate'  # Set back to indeterminate for future use
+        self.progress_bar['value'] = 0
+        self.progress_bar['mode'] = 'determinate'
         self.status_var.set("Ready" if success else "Merge Failed!")
         if success:
             messagebox.showinfo("Success", message)
