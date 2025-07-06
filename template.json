@@ -1,0 +1,24 @@
+{
+    "pre_clips": [
+        {
+            "path": "C:/Users/jasie/Videos/Nagrania ekranu/Nagrywanie ekranu 2025-04-28 225429.mp4",
+            "texts": [],
+            "is_image": false,
+            "image_duration": null
+        },
+        {
+            "path": "C:/Users/jasie/Pictures/Screenshots/Zrzut ekranu 2025-04-22 190443.png",
+            "texts": [],
+            "is_image": true,
+            "image_duration": 5
+        }
+    ],
+    "post_clips": [
+        {
+            "path": "C:/Users/jasie/Pictures/Screenshots/Zrzut ekranu 2025-04-24 163459.png",
+            "texts": [],
+            "is_image": true,
+            "image_duration": 5
+        }
+    ]
+}

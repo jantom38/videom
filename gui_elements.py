@@ -1,10 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
-
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import copy
-
 
 class VideoConfigDialog:
     def __init__(self, parent, title, video_path="", texts_data=None, is_image=False, image_duration=5):
@@ -31,6 +29,8 @@ class VideoConfigDialog:
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(1, weight=3)  # Give more space to config frame
         main_frame.rowconfigure(1, weight=1)
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
 
         # --- Left Panel: File and Texts List ---
         left_panel = ttk.Frame(main_frame, padding="10")
@@ -58,7 +58,25 @@ class VideoConfigDialog:
         button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Skip Text", command=self.skip_text_clicked).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
 
+    def skip_text_clicked(self):
+        video_path = self.video_var.get().strip()
+        if not video_path or not os.path.exists(video_path):
+            messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
+            return
+
+        # Ustaw pustą listę tekstów
+        self.texts_data = []
+
+        if self.is_image:
+            duration = self.image_duration_var.get()
+            self.result = (video_path, self.texts_data, duration)
+        else:
+            self.result = (video_path, self.texts_data, None)
+        self.dialog.destroy()
     def setup_texts_tree(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.grid(row=3, column=0, sticky='nswe')
@@ -184,7 +202,6 @@ class VideoConfigDialog:
             timing_str = f"{start} - {start + dur if dur > 0 else 'end'}"
             self.texts_tree.insert('', 'end', iid=i, values=(i + 1, text_content, timing_str))
 
-    # *** FIX: Restored the missing on_text_selected method ***
     def on_text_selected(self, event=None):
         selection = self.texts_tree.selection()
         if not selection:
@@ -341,11 +358,173 @@ class VideoConfigDialog:
             messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
             return
 
+        # Tekst jest opcjonalny - akceptuj nawet jeśli lista tekstów jest pusta
         if self.is_image:
             duration = self.image_duration_var.get()
             self.result = (video_path, self.texts_data, duration)
         else:
             self.result = (video_path, self.texts_data, None)
+        self.dialog.destroy()
+
+    def cancel_clicked(self):
+        self.result = None
+        self.dialog.destroy()
+
+class TemplateConfigDialog:
+    def __init__(self, parent, title, clips_data=None):
+        self.parent = parent
+        self.clips_data = copy.deepcopy(clips_data) if clips_data is not None else []
+        self.result = None
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(title)
+        self.dialog.geometry("900x700")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        self.setup_dialog_ui()
+        self.update_file_list()
+        self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
+
+    def setup_dialog_ui(self):
+        main_frame = ttk.Frame(self.dialog, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(2, weight=1)
+
+        title_label = ttk.Label(main_frame, text="Template Clip Configuration", font=('Arial', 16, 'bold'))
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+
+        list_label = ttk.Label(main_frame, text="Template Clips:", font=('Arial', 12, 'bold'))
+        list_label.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(0, 10))
+
+        columns = ('Order', 'File', 'Text Overlays')
+        self.tree = ttk.Treeview(main_frame, columns=columns, show='headings', height=10)
+        self.tree.heading('Order', text='#')
+        self.tree.heading('File', text='File')
+        self.tree.heading('Text Overlays', text='Text Overlays')
+        self.tree.column('Order', width=50, anchor='center', stretch=tk.NO)
+        self.tree.column('File', width=400)
+        self.tree.column('Text Overlays', width=150, anchor='center')
+        scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        self.tree.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        scrollbar.grid(row=2, column=2, sticky=(tk.N, tk.S), pady=(0, 10))
+
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=3, column=0, columnspan=3, pady=(0, 20))
+        ttk.Button(button_frame, text="Add File", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1, padx=(0, 10))
+        ttk.Button(button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2, padx=(0, 10))
+        ttk.Button(button_frame, text="Move Up", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
+        ttk.Button(button_frame, text="Move Down", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
+        ttk.Button(button_frame, text="Clear All", command=self.clear_all_files).grid(row=0, column=5)
+
+        bottom_button_frame = ttk.Frame(main_frame)
+        bottom_button_frame.grid(row=4, column=0, columnspan=3, pady=(10, 0), sticky="e")
+        ttk.Button(bottom_button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(bottom_button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
+
+    def add_file_dialog(self):
+        path = filedialog.askopenfilename(
+            title="Wybierz plik wideo lub obraz",
+            filetypes=[("Video/Image", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png")]
+        )
+        if not path:
+            return
+
+        is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
+        dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip", video_path=path, texts_data=[],
+                                  is_image=is_image)
+        self.dialog.wait_window(dialog.dialog)
+
+        if dialog.result:
+            path, texts_data, duration = dialog.result
+            clip_data = {
+                'path': path,
+                'texts': texts_data,
+                'is_image': is_image,
+                'image_duration': duration if is_image else None
+            }
+            self.clips_data.append(clip_data)
+            self.update_file_list()
+
+    def edit_file_dialog(self):
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a file to edit.", parent=self.dialog)
+            return
+
+        item = selection[0]
+        index = self.tree.index(item)
+        clip_data = self.clips_data[index]
+
+        dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip",
+                                  video_path=clip_data['path'],
+                                  texts_data=clip_data['texts'],
+                                  is_image=clip_data['is_image'],
+                                  image_duration=clip_data.get('image_duration', 5))
+        self.dialog.wait_window(dialog.dialog)
+
+        if dialog.result:
+            path, new_texts_data, new_duration = dialog.result
+            clip_data['texts'] = new_texts_data
+            if clip_data['is_image']:
+                clip_data['image_duration'] = new_duration
+            self.update_file_list()
+
+    def remove_file(self):
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a file to remove.", parent=self.dialog)
+            return
+
+        indices = sorted([self.tree.index(item) for item in selection], reverse=True)
+        for index in indices:
+            self.clips_data.pop(index)
+        self.update_file_list()
+
+    def move_file_up(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        for item in selection:
+            index = self.tree.index(item)
+            if index > 0:
+                self.clips_data.insert(index - 1, self.clips_data.pop(index))
+        self.update_file_list()
+
+    def move_file_down(self):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        for item in reversed(selection):
+            index = self.tree.index(item)
+            if index < len(self.clips_data) - 1:
+                self.clips_data.insert(index + 1, self.clips_data.pop(index))
+        self.update_file_list()
+
+    def clear_all_files(self):
+        if self.clips_data and messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all template clips?", parent=self.dialog):
+            self.clips_data.clear()
+            self.update_file_list()
+
+    def update_file_list(self):
+        self.tree.selection_remove(self.tree.selection())
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        for i, clip_data in enumerate(self.clips_data):
+            filename = os.path.basename(clip_data['path'])
+            if clip_data['is_image']:
+                duration = clip_data.get('image_duration', 5)
+                filename = f"{filename} ({duration}s)"
+            num_texts = len(clip_data.get('texts', []))
+            text_display = f"{num_texts} overlay(s)" if num_texts > 0 else "No text"
+            self.tree.insert('', 'end', values=(i + 1, filename, text_display))
+
+    def ok_clicked(self):
+        self.result = self.clips_data
         self.dialog.destroy()
 
     def cancel_clicked(self):

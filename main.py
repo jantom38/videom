@@ -18,6 +18,13 @@ os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magi
 # this line might not be necessary.
 
 
+import tkinter as tk
+from tkinter import ttk
+from app_gui import VideoMergerGUI
+from template_manager import TemplateManager
+import os
+os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
+
 def main():
     root = tk.Tk()
     style = ttk.Style(root)
@@ -26,7 +33,8 @@ def main():
     except tk.TclError:
         print("Theme 'clam' not available, using default.")
 
-    app = VideoMergerGUI(root)
+    template_manager = TemplateManager()
+    app = VideoMergerGUI(root, template_manager)
     root.mainloop()
 
 if __name__ == "__main__":
