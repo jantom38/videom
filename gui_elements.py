@@ -1,7 +1,10 @@
+# gui_elements.py
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
 import data_load
+
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import copy
 
@@ -99,54 +102,33 @@ class VideoConfigDialog:
             print(f"Nie udało się wstępnie wypełnić numeru indeksu: {e}")
             self.item_no_var.set("")
 
+    # ZMIANA: Funkcje wczytujące dane teraz dodają symbole zastępcze zamiast konkretnych tekstów.
     def load_names_data(self):
-        item_no = self.item_no_var.get().strip()
-        if not item_no:
-            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
-            return
-        try:
-            names = data_load.load_names(item_no)
-            if names.get("PL"):
-                self._add_loaded_data_as_text(names["PL"])
-            if names.get("EN"):
-                self._add_loaded_data_as_text(names["EN"])
-        except Exception as e:
-            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania nazw: {e}", parent=self.dialog)
+        """Adds placeholders for Polish and English names."""
+        self._add_placeholder_text("{NAZWA_PL}")
+        self._add_placeholder_text("{NAZWA_EN}")
+        messagebox.showinfo("Info",
+                            "Dodano symbole zastępcze dla nazw PL i EN.\nZostaną one wypełnione danymi podczas tworzenia wideo.",
+                            parent=self.dialog)
 
     def load_description_data(self):
-        item_no = self.item_no_var.get().strip()
-        if not item_no:
-            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
-            return
-        try:
-            description = data_load.load_description(item_no)
-            self._add_loaded_data_as_text(f'Opis: {description}')
-        except Exception as e:
-            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania opisu: {e}", parent=self.dialog)
+        """Adds a placeholder for the description."""
+        self._add_placeholder_text("{OPIS}")
+        messagebox.showinfo("Info", "Dodano symbol zastępczy dla opisu.", parent=self.dialog)
 
     def load_materials_data(self):
-        item_no = self.item_no_var.get().strip()
-        if not item_no:
-            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
-            return
-        try:
-            materials = data_load.load_materials(item_no)
-            self._add_loaded_data_as_text(f'Materiały: {materials}')
-        except Exception as e:
-            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania materiałów: {e}",
-                                 parent=self.dialog)
+        """Adds a placeholder for materials."""
+        self._add_placeholder_text("{MATERIALY}")
+        messagebox.showinfo("Info", "Dodano symbol zastępczy dla materiałów.", parent=self.dialog)
 
-    def _add_loaded_data_as_text(self, text_content, start_time_offset=0):
-        """Dodaje załadowane dane jako nowy tekst do listy."""
-        if not text_content or "nie znaleziono" in text_content or "not found" in text_content:
-            messagebox.showinfo("Brak danych", f"Nie znaleziono danych w pliku Excel.", parent=self.dialog)
-            return
-
+    # ZMIANA: Zmieniono nazwę i logikę funkcji, aby dodawała dowolny tekst (w tym symbol zastępczy).
+    def _add_placeholder_text(self, placeholder_text):
+        """Adds a new text entry with the given placeholder text."""
         # Użyj długości listy jako offset, aby teksty nie nakładały się na siebie
-        default_start_time = len(self.texts_data) * 2 + start_time_offset
+        default_start_time = len(self.texts_data) * 2
 
         new_text_data = {
-            'text': text_content,
+            'text': placeholder_text,  # Wstawiamy symbol jako tekst
             'config': {
                 'fontsize': 40, 'color': 'white', 'movement': 'static',
                 'opacity': 0.9, 'position': ('center', 'center'),
@@ -159,6 +141,7 @@ class VideoConfigDialog:
         new_id = len(self.texts_data) - 1
         self.texts_tree.selection_set(new_id)
         self.texts_tree.focus(new_id)
+
     def skip_text_clicked(self):
         video_path = self.video_var.get().strip()
         if not video_path or not os.path.exists(video_path):
@@ -174,6 +157,9 @@ class VideoConfigDialog:
         else:
             self.result = (video_path, self.texts_data, None)
         self.dialog.destroy()
+
+    # Reszta pliku pozostaje bez zmian...
+    # ... (cała reszta kodu z gui_elements.py)
     def setup_texts_tree(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.grid(row=3, column=0, sticky='nswe')
@@ -467,6 +453,7 @@ class VideoConfigDialog:
         self.result = None
         self.dialog.destroy()
 
+
 class TemplateConfigDialog:
     def __init__(self, parent, title, clips_data=None):
         self.parent = parent
@@ -511,7 +498,8 @@ class TemplateConfigDialog:
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=3, column=0, columnspan=3, pady=(0, 20))
         ttk.Button(button_frame, text="Add File", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
-        ttk.Button(button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1, padx=(0, 10))
+        ttk.Button(button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1,
+                                                                                           padx=(0, 10))
         ttk.Button(button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2, padx=(0, 10))
         ttk.Button(button_frame, text="Move Up", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
         ttk.Button(button_frame, text="Move Down", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
@@ -532,7 +520,7 @@ class TemplateConfigDialog:
 
         is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
         dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip", video_path=path, texts_data=[],
-                                  is_image=is_image)
+                                   is_image=is_image)
         self.dialog.wait_window(dialog.dialog)
 
         if dialog.result:
@@ -557,10 +545,10 @@ class TemplateConfigDialog:
         clip_data = self.clips_data[index]
 
         dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip",
-                                  video_path=clip_data['path'],
-                                  texts_data=clip_data['texts'],
-                                  is_image=clip_data['is_image'],
-                                  image_duration=clip_data.get('image_duration', 5))
+                                   video_path=clip_data['path'],
+                                   texts_data=clip_data['texts'],
+                                   is_image=clip_data['is_image'],
+                                   image_duration=clip_data.get('image_duration', 5))
         self.dialog.wait_window(dialog.dialog)
 
         if dialog.result:
@@ -602,7 +590,9 @@ class TemplateConfigDialog:
         self.update_file_list()
 
     def clear_all_files(self):
-        if self.clips_data and messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all template clips?", parent=self.dialog):
+        if self.clips_data and messagebox.askyesno("Confirm Clear",
+                                                   "Are you sure you want to clear all template clips?",
+                                                   parent=self.dialog):
             self.clips_data.clear()
             self.update_file_list()
 

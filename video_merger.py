@@ -1,3 +1,5 @@
+# video_merger.py
+
 import os
 
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
@@ -5,6 +7,7 @@ from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, concaten
 import math
 import re
 import traceback
+import data_load  # NOWOŚĆ: Import modułu do ładowania danych
 
 
 class MoviePyProgressLogger:
@@ -50,6 +53,29 @@ class VideoMerger:
             'texts': texts_data  # List of text configs
         })
 
+    # NOWOŚĆ: Funkcja do rozwiązywania symboli zastępczych
+    def _resolve_text(self, text, item_no):
+        """Resolves placeholder text into actual data using the provided item_no."""
+        if not item_no or not text.startswith('{') or not text.endswith('}'):
+            return text
+
+        placeholder = text.upper()  # Używamy wielkich liter dla spójności
+
+        try:
+            if placeholder == "{NAZWA_PL}":
+                return data_load.load_names(item_no).get("PL", "Brak nazwy PL")
+            elif placeholder == "{NAZWA_EN}":
+                return data_load.load_names(item_no).get("EN", "Brak nazwy EN")
+            elif placeholder == "{OPIS}":
+                return data_load.load_description(item_no)
+            elif placeholder == "{MATERIALY}":
+                return data_load.load_materials(item_no)
+            else:
+                return text  # Zwróć oryginalny tekst, jeśli nie rozpoznano symbolu
+        except Exception as e:
+            print(f"Błąd podczas rozwiązywania symbolu '{text}' dla indeksu '{item_no}': {e}")
+            return f"Błąd danych dla {text}"
+
     def create_text_clip(self, text_content, config, clip_duration):
         text_start = config.get('start_time', 0)
         text_dur = config.get('duration')
@@ -78,11 +104,8 @@ class VideoMerger:
             txt_clip = txt_clip.set_position(self._float_position())
         else:  # static
             pos = config.get('position', ('center', 'center'))
-            # Convert canvas coordinates to moviepy coordinates if they are absolute
             if isinstance(pos, (list, tuple)) and all(isinstance(i, (int, float)) for i in pos):
-                # Assuming canvas size was 320x180 for position selection
-                # This might need adjustment if your final video size is known and different
-                pass  # Moviepy handles absolute pixel coords fine
+                pass
             txt_clip = txt_clip.set_position(pos)
 
         return txt_clip
@@ -91,14 +114,14 @@ class VideoMerger:
         return lambda t: ('center', 50 + 30 * abs(2 * (t % 2) - 1))
 
     def _slide_position(self, duration):
-        # Slide across the width of the screen
         return lambda t: ((t / duration) * (self.final_size[0] if hasattr(self, 'final_size') else 1920) - 100,
                           'center')
 
     def _float_position(self):
         return lambda t: ('center', 100 + 50 * math.sin(2 * math.pi * t / 3))
 
-    def process_clip(self, clip_data):
+    # ZMIANA: process_clip przyjmuje teraz item_no do rozwiązywania symboli
+    def process_clip(self, clip_data, item_no):
         try:
             base_clip = None
             clip_path = clip_data['path']
@@ -110,8 +133,6 @@ class VideoMerger:
                 base_clip = VideoFileClip(clip_path)
                 clip_duration = base_clip.duration
 
-            # Set a standard size for all clips to avoid issues with concatenation
-            # Using the size of the first clip as the standard
             if not hasattr(self, 'final_size') or self.final_size is None:
                 if base_clip.size is None:
                     raise ValueError(f"Nie można odczytać rozmiaru klipu: {clip_path}")
@@ -120,10 +141,13 @@ class VideoMerger:
 
             text_clips = []
             for text_info in clip_data['texts']:
-                text_content = text_info.get('text', '').strip()
-                if text_content:
+                # ZMIANA: Rozwiązujemy symbol zastępczy przed utworzeniem klipu tekstowego
+                raw_text = text_info.get('text', '').strip()
+                resolved_text = self._resolve_text(raw_text, item_no)
+
+                if resolved_text:
                     text_clip = self.create_text_clip(
-                        text_content,
+                        resolved_text,
                         text_info['config'],
                         clip_duration
                     )
@@ -141,12 +165,17 @@ class VideoMerger:
             traceback.print_exc()
             raise
 
-    def merge_videos(self, output_path, progress_callback=None):
+    # ZMIANA: merge_videos przyjmuje teraz item_no
+    def merge_videos(self, output_path, item_no, progress_callback=None):
         self.current_progress_callback = progress_callback
-        self.final_size = None  # Reset final size for each merge
+        self.final_size = None
 
         if not self.clips_data:
             return False, "No videos or images added to merge!"
+
+        if not item_no and any('{' in t['text'] for c in self.clips_data for t in c['texts']):
+            print(
+                "OSTRZEŻENIE: Wykryto symbole zastępcze, ale nie podano numeru indeksu produktu. Symbole nie zostaną podmienione.")
 
         processed_clips = []
         total_clips = len(self.clips_data)
@@ -161,7 +190,8 @@ class VideoMerger:
                 continue
 
             try:
-                processed_clip = self.process_clip(clip_data)
+                # ZMIANA: Przekazujemy item_no do process_clip
+                processed_clip = self.process_clip(clip_data, item_no)
                 processed_clips.append(processed_clip)
             except Exception as e:
                 print(f"ERROR processing clip {clip_data['path']}: {str(e)}")

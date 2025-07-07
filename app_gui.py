@@ -20,6 +20,72 @@ class VideoMergerGUI:
         self.load_template()
         self.setup_ui()
 
+    def merge_files_thread(self, output_path, item_no, progress_callback):
+        # Przygotuj pełną listę klipów: pre-clips + user-clips + post-clips
+        # Uwaga: poniższa logika jest trochę zawiła, upraszczamy ją
+
+        # Lista klipów użytkownika (pomiędzy pre i post)
+        user_clips_start_index = len(self.pre_template_clips)
+        user_clips_end_index = len(self.merger.clips_data) - len(self.post_template_clips)
+        user_clips = self.merger.clips_data[user_clips_start_index:user_clips_end_index]
+
+        full_clips = self.pre_template_clips + user_clips + self.post_template_clips
+
+        # Utwórz tymczasowego mergera z pełną listą
+        temp_merger = VideoMerger()
+        for clip in full_clips:
+            temp_merger.add_clip(
+                clip['path'],
+                clip['texts'],
+                clip.get('image_duration')
+            )
+
+        # Scal filmy z pełną listą, przekazując numer indeksu
+        success, message = temp_merger.merge_videos(
+            output_path,
+            item_no,  # Przekazujemy indeks!
+            progress_callback
+        )
+
+        # Zwróć wynik do głównego wątku
+        self.root.after(0, lambda: self.merge_complete(success, message))
+
+    def start_merge_process(self):
+        if not self.merger.clips_data:
+            messagebox.showwarning("No Files",
+                                   "Please add at least one video or image to merge (or ensure a template is set).")
+            return
+        if not self.output_var.get():
+            messagebox.showwarning("No Output File", "Please specify an output file.")
+            return
+
+        self.progress_bar['value'] = 0
+        self.progress_bar['mode'] = 'determinate'
+        self.status_var.set("Processing...")
+
+        # Ensure post_template_clips are appended if not already in clips_data
+        current_clips_count = len(self.merger.clips_data)
+        expected_clips_count = len(self.pre_template_clips) + (
+                current_clips_count - len(self.pre_template_clips) - len(self.post_template_clips)) + len(
+            self.post_template_clips)
+        if current_clips_count < expected_clips_count:
+            for clip_data in self.post_template_clips:
+                self.merger.add_clip(
+                    clip_data['path'],
+                    clip_data['texts'],
+                    clip_data.get('image_duration')
+                )
+
+        # Get the item number from the input field
+        item_no = self.item_no_var.get().strip()
+
+        thread = threading.Thread(
+            target=self.merge_files_thread,
+            args=(self.output_var.get(), item_no, self.update_progress),
+            daemon=True
+        )
+        thread.start()
+
     def load_template(self):
         success, result = self.template_manager.load_template()
         if success:
@@ -121,8 +187,10 @@ class VideoMergerGUI:
         self.button_frame.grid(row=3, column=0, columnspan=3, pady=(0, 20))
 
         ttk.Button(self.button_frame, text="Add File", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
-        ttk.Button(self.button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1, padx=(0, 10))
-        ttk.Button(self.button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2, padx=(0, 10))
+        ttk.Button(self.button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1,
+                                                                                                padx=(0, 10))
+        ttk.Button(self.button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2,
+                                                                                             padx=(0, 10))
         ttk.Button(self.button_frame, text="Move Up", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
         ttk.Button(self.button_frame, text="Move Down", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
         ttk.Button(self.button_frame, text="Clear All", command=self.clear_all_files).grid(row=0, column=5)
@@ -136,7 +204,8 @@ class VideoMergerGUI:
         self.output_var = tk.StringVar(value="merged_output.mp4")
         ttk.Entry(output_frame, textvariable=self.output_var).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         ttk.Button(output_frame, text="Browse", command=self.browse_output_file).grid(row=0, column=2)
-        ttk.Button(output_frame, text="Merge Files", command=self.start_merge_process).grid(row=1, column=0, columnspan=3, pady=(10, 0))
+        ttk.Button(output_frame, text="Merge Files", command=self.start_merge_process).grid(row=1, column=0,
+                                                                                            columnspan=3, pady=(10, 0))
 
     def setup_progress_area(self, parent):
         progress_frame = ttk.LabelFrame(parent, text="Progress", padding="10")
@@ -210,10 +279,10 @@ class VideoMergerGUI:
         clip_data = self.merger.clips_data[clip_index]
 
         dialog = VideoConfigDialog(self.root, "Add/Edit Text on Clip",
-                                  video_path=clip_data['path'],
-                                  texts_data=clip_data['texts'],
-                                  is_image=clip_data['is_image'],
-                                  image_duration=clip_data.get('image_duration', 5))
+                                   video_path=clip_data['path'],
+                                   texts_data=clip_data['texts'],
+                                   is_image=clip_data['is_image'],
+                                   image_duration=clip_data.get('image_duration', 5))
         self.root.wait_window(dialog.dialog)
 
         if dialog.result:
@@ -255,7 +324,9 @@ class VideoMergerGUI:
         self.update_file_list()
 
     def clear_all_files(self):
-        if self.merger.clips_data[len(self.pre_template_clips):len(self.merger.clips_data)-len(self.post_template_clips)] and messagebox.askyesno("Confirm Clear", "Are you sure you want to clear all non-template files?"):
+        if self.merger.clips_data[len(self.pre_template_clips):len(self.merger.clips_data) - len(
+                self.post_template_clips)] and messagebox.askyesno("Confirm Clear",
+                                                                   "Are you sure you want to clear all non-template files?"):
             self.merger.clips_data = self.pre_template_clips + self.post_template_clips
             self.update_file_list()
 
@@ -288,33 +359,6 @@ class VideoMergerGUI:
             filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")])
         if filename: self.output_var.set(filename)
 
-    def start_merge_process(self):
-        if not self.merger.clips_data:
-            messagebox.showwarning("No Files", "Please add at least one video or image to merge (or ensure a template is set).")
-            return
-        if not self.output_var.get():
-            messagebox.showwarning("No Output File", "Please specify an output file.")
-            return
-
-        self.progress_bar['value'] = 0
-        self.progress_bar['mode'] = 'determinate'
-        self.status_var.set("Processing...")
-
-        # Ensure post_template_clips are appended if not already in clips_data
-        current_clips_count = len(self.merger.clips_data)
-        expected_clips_count = len(self.pre_template_clips) + (current_clips_count - len(self.pre_template_clips) - len(self.post_template_clips)) + len(self.post_template_clips)
-        if current_clips_count < expected_clips_count:
-            for clip_data in self.post_template_clips:
-                self.merger.add_clip(
-                    clip_data['path'],
-                    clip_data['texts'],
-                    clip_data.get('image_duration')
-                )
-
-        thread = threading.Thread(target=self.merge_files_thread, args=(self.output_var.get(), self.update_progress),
-                                 daemon=True)
-        thread.start()
-
     def update_progress(self, percentage=None, message=""):
         self.root.after(0, lambda: self._actual_update_progress(percentage, message))
 
@@ -329,31 +373,6 @@ class VideoMergerGUI:
                 self.progress_bar['mode'] = 'indeterminate'
                 self.progress_bar.start()
         self.status_var.set(message)
-
-    def merge_files_thread(self, output_path, progress_callback):
-        # Przygotuj pełną listę klipów: pre-clips + user-clips + post-clips
-        full_clips = (
-                self.merger.clips_data[:] +  # pre-clips + user-clips
-                self.post_template_clips  # post-clips
-        )
-
-        # Utwórz tymczasowego mergera z pełną listą
-        temp_merger = VideoMerger()
-        for clip in full_clips:
-            temp_merger.add_clip(
-                clip['path'],
-                clip['texts'],
-                clip.get('image_duration')
-            )
-
-        # Scal filmy z pełną listą
-        success, message = temp_merger.merge_videos(
-            output_path,
-            progress_callback
-        )
-
-        # Zwróć wynik do głównego wątku
-        self.root.after(0, lambda: self.merge_complete(success, message))
 
     def merge_complete(self, success, message):
         self.progress_bar.stop()

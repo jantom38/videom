@@ -1,24 +1,72 @@
 {
     "pre_clips": [
         {
-            "path": "C:/Users/jasie/Videos/Nagrania ekranu/Nagrywanie ekranu 2025-04-28 225429.mp4",
-            "texts": [],
-            "is_image": false,
-            "image_duration": null
-        },
-        {
-            "path": "C:/Users/jasie/Pictures/Screenshots/Zrzut ekranu 2025-04-22 190443.png",
-            "texts": [],
+            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/temp 1 pion.jpg",
+            "texts": [
+                {
+                    "text": "{NAZWA_PL}",
+                    "config": {
+                        "fontsize": 40,
+                        "color": "white",
+                        "movement": "static",
+                        "opacity": 0.9,
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "position": [
+                            160,
+                            32
+                        ]
+                    }
+                },
+                {
+                    "text": "{NAZWA_EN}",
+                    "config": {
+                        "fontsize": 40,
+                        "color": "white",
+                        "movement": "static",
+                        "opacity": 0.9,
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "position": [
+                            158,
+                            93
+                        ]
+                    }
+                },
+                {
+                    "text": "{OPIS}",
+                    "config": {
+                        "fontsize": 40,
+                        "color": "white",
+                        "movement": "static",
+                        "opacity": 0.9,
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "position": [
+                            159,
+                            142
+                        ]
+                    }
+                },
+                {
+                    "text": "{MATERIALY}",
+                    "config": {
+                        "fontsize": 40,
+                        "color": "white",
+                        "movement": "static",
+                        "opacity": 0.9,
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "position": [
+                            161,
+                            171
+                        ]
+                    }
+                }
+            ],
             "is_image": true,
             "image_duration": 5
         }
     ],
-    "post_clips": [
-        {
-            "path": "C:/Users/jasie/Pictures/Screenshots/Zrzut ekranu 2025-04-24 163459.png",
-            "texts": [],
-            "is_image": true,
-            "image_duration": 5
-        }
-    ]
+    "post_clips": []
 }
