@@ -51,7 +51,7 @@ class VideoMergerGUI:
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
 
-        title_label = ttk.Label(main_frame, text="Video Merger with Floating Text", font=('Arial', 16, 'bold'))
+        title_label = ttk.Label(main_frame, text="Video Merger", font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
 
         self.setup_video_list(main_frame)
