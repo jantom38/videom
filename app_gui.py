@@ -15,6 +15,7 @@ class VideoMergerGUI:
         self.merger = VideoMerger()
         self.pre_template_clips = []  # Clips to be added before main clips
         self.post_template_clips = []  # Clips to be added after main clips
+        self.item_no_var = tk.StringVar()
 
         self.load_template()
         self.setup_ui()
@@ -50,6 +51,13 @@ class VideoMergerGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
+
+        # --- NOWOŚĆ: Ramka i pole na indeks produktu ---
+        index_frame = ttk.Frame(main_frame)
+        index_frame.grid(row=1, column=0, columnspan=3, pady=(0, 10), sticky="w")
+        ttk.Label(index_frame, text="Indeks produktu:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(160,0))
+        ttk.Entry(index_frame, textvariable=self.item_no_var, width=40).pack(side=tk.LEFT)
+        # --- KONIEC NOWOŚCI ---
 
         title_label = ttk.Label(main_frame, text="Video Merger", font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
@@ -148,9 +156,14 @@ class VideoMergerGUI:
         if not path:
             return
 
+        # ZMIANA: Pobierz indeks z pola w głównym oknie
+        item_no_from_main = self.item_no_var.get().strip()
+
         is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
-        dialog = VideoConfigDialog(self.root, "Add/Edit Text on Clip", video_path=path,
-                                   texts_data=[], is_image=is_image)
+
+        # ZMIANA: Przekaż pobrany indeks do okna dialogowego
+        dialog = VideoConfigDialog(self.root, "Dodaj/Edytuj tekst na klipie", video_path=path,
+                                   texts_data=[], is_image=is_image, item_no=item_no_from_main)
         self.root.wait_window(dialog.dialog)
 
         if dialog.result:

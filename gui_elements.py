@@ -1,17 +1,25 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
+import data_load
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import copy
 
+
 class VideoConfigDialog:
-    def __init__(self, parent, title, video_path="", texts_data=None, is_image=False, image_duration=5):
+    # ZMIANA: Konstruktor przyjmuje teraz `item_no`
+    def __init__(self, parent, title, video_path="", texts_data=None, is_image=False, image_duration=5, item_no=""):
         self.parent = parent
+        self.video_path = video_path
         self.is_image = is_image
         self.image_duration = image_duration
         self.texts_data = copy.deepcopy(texts_data) if texts_data is not None else []
         self.result = None
         self.selected_text_id = None
+
+        self.item_no_var = tk.StringVar()
+        # ZMIANA: Ustawia wartość pola na podstawie przekazanego indeksu
+        self.item_no_var.set(item_no)
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(title)
@@ -20,6 +28,7 @@ class VideoConfigDialog:
         self.dialog.grab_set()
 
         self.setup_dialog_ui(video_path)
+        # USUNIĘTO wywołanie `_prefill_item_no()`
         self.populate_texts_tree()
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
         self.toggle_config_controls_state()
@@ -61,7 +70,95 @@ class VideoConfigDialog:
         ttk.Button(button_frame, text="Skip Text", command=self.skip_text_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
+        import_frame = ttk.LabelFrame(left_panel, text="Importuj dane z pliku", padding=10)
+        import_frame.grid(row=5, column=0, pady=(15, 0), sticky="ew")
+        import_frame.columnconfigure(1, weight=1)  # Pozwala polu na indeks się rozszerzać
 
+        # NOWOŚĆ: Dodane pole na indeks produktu
+        ttk.Label(import_frame, text="Indeks:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5), pady=(0, 10))
+        self.item_no_entry = ttk.Entry(import_frame, textvariable=self.item_no_var)
+        self.item_no_entry.grid(row=0, column=1, sticky="ew", pady=(0, 10))
+
+        # Przyciski importu w nowej ramce dla lepszego ułożenia
+        button_import_frame = ttk.Frame(import_frame)
+        button_import_frame.grid(row=1, column=0, columnspan=2)
+
+        ttk.Button(button_import_frame, text="Nazwy", command=self.load_names_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_import_frame, text="Opis", command=self.load_description_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_import_frame, text="Materiały", command=self.load_materials_data).pack(side=tk.LEFT, padx=2)
+
+    def _prefill_item_no(self):
+        """Wyciąga numer indeksu z nazwy pliku, aby wstępnie wypełnić pole."""
+        if not self.video_path:
+            return
+        try:
+            filename = os.path.basename(self.video_path)
+            item_no, _ = os.path.splitext(filename)
+            self.item_no_var.set(item_no)
+        except Exception as e:
+            print(f"Nie udało się wstępnie wypełnić numeru indeksu: {e}")
+            self.item_no_var.set("")
+
+    def load_names_data(self):
+        item_no = self.item_no_var.get().strip()
+        if not item_no:
+            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
+            return
+        try:
+            names = data_load.load_names(item_no)
+            if names.get("PL"):
+                self._add_loaded_data_as_text(names["PL"])
+            if names.get("EN"):
+                self._add_loaded_data_as_text(names["EN"])
+        except Exception as e:
+            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania nazw: {e}", parent=self.dialog)
+
+    def load_description_data(self):
+        item_no = self.item_no_var.get().strip()
+        if not item_no:
+            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
+            return
+        try:
+            description = data_load.load_description(item_no)
+            self._add_loaded_data_as_text(f'Opis: {description}')
+        except Exception as e:
+            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania opisu: {e}", parent=self.dialog)
+
+    def load_materials_data(self):
+        item_no = self.item_no_var.get().strip()
+        if not item_no:
+            messagebox.showerror("Błąd", "Proszę wpisać numer indeksu produktu.", parent=self.dialog)
+            return
+        try:
+            materials = data_load.load_materials(item_no)
+            self._add_loaded_data_as_text(f'Materiały: {materials}')
+        except Exception as e:
+            messagebox.showerror("Błąd ładowania", f"Wystąpił błąd podczas ładowania materiałów: {e}",
+                                 parent=self.dialog)
+
+    def _add_loaded_data_as_text(self, text_content, start_time_offset=0):
+        """Dodaje załadowane dane jako nowy tekst do listy."""
+        if not text_content or "nie znaleziono" in text_content or "not found" in text_content:
+            messagebox.showinfo("Brak danych", f"Nie znaleziono danych w pliku Excel.", parent=self.dialog)
+            return
+
+        # Użyj długości listy jako offset, aby teksty nie nakładały się na siebie
+        default_start_time = len(self.texts_data) * 2 + start_time_offset
+
+        new_text_data = {
+            'text': text_content,
+            'config': {
+                'fontsize': 40, 'color': 'white', 'movement': 'static',
+                'opacity': 0.9, 'position': ('center', 'center'),
+                'start_time': default_start_time, 'duration': 5, 'font': 'Arial-Bold'
+            }
+        }
+        self.texts_data.append(new_text_data)
+        self.populate_texts_tree()
+        # Automatycznie zaznacz nowo dodany element
+        new_id = len(self.texts_data) - 1
+        self.texts_tree.selection_set(new_id)
+        self.texts_tree.focus(new_id)
     def skip_text_clicked(self):
         video_path = self.video_var.get().strip()
         if not video_path or not os.path.exists(video_path):

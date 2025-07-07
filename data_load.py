@@ -5,40 +5,35 @@ def load_description(item_no):
     df = pd.read_excel("dane_z_nav.xlsx", sheet_name="Indeksy")
 
     foreign = df[df["Item No_"] == item_no]
-    # foreign=foreign["Assortment Card No_"]
+    if foreign.empty:
+        return "nie znaleziono indeksu w bazie"
     foreign = foreign["Assortment Card No_"].values[0]
-    print(foreign)
-
 
     df = pd.read_excel("dane_z_nav.xlsx", sheet_name="Opisy")
     wynik = df[df["Assortment Card No_"] == foreign]
 
-    # Jeśli nie znaleziono wyników, zwróć pusty string
     if wynik.empty:
         return "nie znaleziono opisu w bazie"
 
-    # Połącz wszystkie wartości kolumny "Opis Indeksu" w jeden string, oddzielając spacjami
-    opis = " ".join(wynik["Opis Indeksu"].astype(str))  # .astype(str) na wypadek wartości nie-tekstowych
+    opis = " ".join(wynik["Opis Indeksu"].astype(str).dropna())
     return opis
 
 def load_materials(Item_no):
     df = pd.read_excel("dane_z_nav.xlsx", sheet_name="Indeksy")
 
     foreign = df[df["Item No_"]==Item_no]
-    #foreign=foreign["Assortment Card No_"]
+    if foreign.empty:
+        return "nie znaleziono indeksu w bazie"
     foreign=foreign["Assortment Card No_"].values[0]
-    print(foreign)
 
     df = pd.read_excel("dane_z_nav.xlsx", sheet_name="Materialy")
 
     wynik = df[df["Assortment Card No_"]==foreign]
 
-    # Jeśli nie znaleziono wyników, zwróć pusty string
     if wynik.empty:
-        return "nie znaleziono opisu w bazie"
+        return "nie znaleziono materiału w bazie"
 
-    # Połącz wszystkie wartości kolumny "Opis Indeksu" w jeden string, oddzielając spacjami
-    opis = " ".join(wynik["Material"].astype(str))  # .astype(str) na wypadek wartości nie-tekstowych
+    opis = " ".join(wynik["Material"].astype(str).dropna())
     return opis
 
 
@@ -57,4 +52,6 @@ def load_names(Item_no):
         "EN": opis_en if opis_en else "Brak opisu angielskiego"
     }
 
-print(load_description("10004"))
+# This block will only run when you execute `data_load.py` directly
+if __name__ == '__main__':
+    print("--- Testing data_load.py ---")
