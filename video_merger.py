@@ -80,33 +80,60 @@ class VideoMerger:
         text_start = config.get('start_time', 0)
         text_dur = config.get('duration')
 
-        # If duration is 0 or None, it means full length
+        # Jeśli duration jest 0 lub None, oznacza to pełną długość
         duration = text_dur if text_dur else clip_duration
 
         if text_start > clip_duration:
-            return None  # Text starts after the clip ends
+            return None  # Tekst zaczyna się po zakończeniu klipu
 
-        txt_clip = TextClip(
-            text_content,
-            fontsize=config.get('fontsize', 50),
-            color=config.get('color', 'white'),
-            font=config.get('font', 'Arial-Bold')
-        ).set_duration(duration).set_start(text_start)
+        # --- POCZĄTEK ZMIAN ---
 
+        # Pobierz szerokość zawijania z konfiguracji
+        wrap_width = config.get('wrap_width')
+
+        # Przygotuj słownik argumentów dla TextClip
+        textclip_kwargs = {
+            'txt': text_content,
+            'fontsize': config.get('fontsize', 50),
+            'color': config.get('color', 'white'),
+            'font': config.get('font', 'Arial-Bold'),
+        }
+
+        # Jeśli szerokość zawijania jest zdefiniowana, użyj metody 'caption'
+        if wrap_width:
+            textclip_kwargs['method'] = 'caption'
+            textclip_kwargs['align'] = 'center'
+            # 'size' jest prawidłowym argumentem do ustawienia szerokości
+            textclip_kwargs['size'] = (wrap_width, None)
+
+        # Utwórz klip tekstowy, przekazując argumenty ze słownika
+        txt_clip = TextClip(**textclip_kwargs)
+
+        # --- KONIEC ZMIAN ---
+
+        txt_clip = txt_clip.set_duration(duration).set_start(text_start)
         txt_clip = txt_clip.set_opacity(config.get('opacity', 0.8))
 
         movement = config.get('movement')
-        if movement == 'bounce':
-            txt_clip = txt_clip.set_position(self._bounce_position())
-        elif movement == 'slide':
-            txt_clip = txt_clip.set_position(self._slide_position(duration))
-        elif movement == 'float':
-            txt_clip = txt_clip.set_position(self._float_position())
-        else:  # static
-            pos = config.get('position', ('center', 'center'))
-            if isinstance(pos, (list, tuple)) and all(isinstance(i, (int, float)) for i in pos):
-                pass
+        if movement == 'static':
+            pos = config.get('position', (0.5, 0.5))
+
+            if (isinstance(pos, (tuple, list)) and len(pos) == 2 and
+                    all(isinstance(p, (int, float)) for p in pos)):
+
+                if 0 <= pos[0] <= 1 and 0 <= pos[1] <= 1:
+                    x = pos[0] * self.final_size[0]
+                    y = pos[1] * self.final_size[1]
+
+                    # 🔽 Skoryguj pozycję, żeby była względem środka tekstu
+                    x -= txt_clip.w / 2
+                    y -= txt_clip.h / 2
+
+                    pos = (x, y)
+
             txt_clip = txt_clip.set_position(pos)
+
+
 
         return txt_clip
 

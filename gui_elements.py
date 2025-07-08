@@ -10,7 +10,7 @@ import copy
 
 
 class VideoConfigDialog:
-    # ZMIANA: Konstruktor przyjmuje teraz `item_no`
+    # Konstruktor przyjmuje `item_no` do wstępnego wypełnienia pola
     def __init__(self, parent, title, video_path="", texts_data=None, is_image=False, image_duration=5, item_no=""):
         self.parent = parent
         self.video_path = video_path
@@ -19,9 +19,11 @@ class VideoConfigDialog:
         self.texts_data = copy.deepcopy(texts_data) if texts_data is not None else []
         self.result = None
         self.selected_text_id = None
+        self.canvas_width = 320
+        self.canvas_height = 180
 
         self.item_no_var = tk.StringVar()
-        # ZMIANA: Ustawia wartość pola na podstawie przekazanego indeksu
+        # Ustawia wartość pola na podstawie przekazanego indeksu
         self.item_no_var.set(item_no)
 
         self.dialog = tk.Toplevel(parent)
@@ -31,7 +33,6 @@ class VideoConfigDialog:
         self.dialog.grab_set()
 
         self.setup_dialog_ui(video_path)
-        # USUNIĘTO wywołanie `_prefill_item_no()`
         self.populate_texts_tree()
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
         self.toggle_config_controls_state()
@@ -41,8 +42,6 @@ class VideoConfigDialog:
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(1, weight=3)  # Give more space to config frame
         main_frame.rowconfigure(1, weight=1)
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
 
         # --- Left Panel: File and Texts List ---
         left_panel = ttk.Frame(main_frame, padding="10")
@@ -59,6 +58,21 @@ class VideoConfigDialog:
         self.setup_texts_tree(left_panel)
         self.setup_text_buttons(left_panel)
 
+        import_frame = ttk.LabelFrame(left_panel, text="Importuj dane z pliku", padding=10)
+        import_frame.grid(row=5, column=0, pady=(15, 0), sticky="ew")
+        import_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(import_frame, text="Indeks:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5), pady=(0, 10))
+        self.item_no_entry = ttk.Entry(import_frame, textvariable=self.item_no_var)
+        self.item_no_entry.grid(row=0, column=1, sticky="ew", pady=(0, 10))
+
+        button_import_frame = ttk.Frame(import_frame)
+        button_import_frame.grid(row=1, column=0, columnspan=2)
+
+        ttk.Button(button_import_frame, text="Nazwy", command=self.load_names_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_import_frame, text="Opis", command=self.load_description_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_import_frame, text="Materiały", command=self.load_materials_data).pack(side=tk.LEFT, padx=2)
+
         # --- Right Panel: Configuration ---
         self.config_frame = ttk.LabelFrame(main_frame, text="Text Configuration (select a text to edit)", padding="15")
         self.config_frame.grid(row=0, column=1, rowspan=2, sticky="nswe")
@@ -70,77 +84,73 @@ class VideoConfigDialog:
         button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
-        ttk.Button(button_frame, text="Skip Text", command=self.skip_text_clicked).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
-        import_frame = ttk.LabelFrame(left_panel, text="Importuj dane z pliku", padding=10)
-        import_frame.grid(row=5, column=0, pady=(15, 0), sticky="ew")
-        import_frame.columnconfigure(1, weight=1)  # Pozwala polu na indeks się rozszerzać
+        ttk.Button(button_frame, text="Skip Text", command=self.skip_text_clicked).pack(side=tk.LEFT, padx=(10, 0))
 
-        # NOWOŚĆ: Dodane pole na indeks produktu
-        ttk.Label(import_frame, text="Indeks:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5), pady=(0, 10))
-        self.item_no_entry = ttk.Entry(import_frame, textvariable=self.item_no_var)
-        self.item_no_entry.grid(row=0, column=1, sticky="ew", pady=(0, 10))
+    def _add_placeholder_text(self, placeholder_text, position=None, fontsize=50, wrap_width=None):
+        """Adds a new text entry with the given placeholder text and positioning."""
+        default_start_time = len(self.texts_data) * 2
 
-        # Przyciski importu w nowej ramce dla lepszego ułożenia
-        button_import_frame = ttk.Frame(import_frame)
-        button_import_frame.grid(row=1, column=0, columnspan=2)
+        if position is None:
+            position = (self.canvas_width / 2, self.canvas_height / 2)
 
-        ttk.Button(button_import_frame, text="Nazwy", command=self.load_names_data).pack(side=tk.LEFT, padx=2)
-        ttk.Button(button_import_frame, text="Opis", command=self.load_description_data).pack(side=tk.LEFT, padx=2)
-        ttk.Button(button_import_frame, text="Materiały", command=self.load_materials_data).pack(side=tk.LEFT, padx=2)
+        new_text_data = {
+            'text': placeholder_text,
+            'config': {
+                'fontsize': fontsize,
+                'color': 'white',
+                'movement': 'static',
+                'opacity': 0.9,
+                'position': position,
+                'start_time': default_start_time,
+                'duration': 5,
+                'font': 'Arial-Bold',
+                'wrap_width': wrap_width  # Add wrapping capability
+            }
+        }
+        self.texts_data.append(new_text_data)
+        self.populate_texts_tree()
+        new_id = str(len(self.texts_data) - 1)
+        if self.texts_tree.exists(new_id):
+            self.texts_tree.selection_set(new_id)
+            self.texts_tree.focus(new_id)
 
-    def _prefill_item_no(self):
-        """Wyciąga numer indeksu z nazwy pliku, aby wstępnie wypełnić pole."""
-        if not self.video_path:
-            return
-        try:
-            filename = os.path.basename(self.video_path)
-            item_no, _ = os.path.splitext(filename)
-            self.item_no_var.set(item_no)
-        except Exception as e:
-            print(f"Nie udało się wstępnie wypełnić numeru indeksu: {e}")
-            self.item_no_var.set("")
-
-    # ZMIANA: Funkcje wczytujące dane teraz dodają symbole zastępcze zamiast konkretnych tekstów.
     def load_names_data(self):
-        """Adds placeholders for Polish and English names."""
-        self._add_placeholder_text("{NAZWA_PL}")
-        self._add_placeholder_text("{NAZWA_EN}")
+        """Adds placeholders for Polish and English names with centered positioning."""
+        # Polish name - centered
+        self._add_placeholder_text(
+            "{NAZWA_PL}",
+            position=(0.5, 0.4),  # 40% wysokości (nieco powyżej środka)
+            fontsize=60
+        )
+        # English name - centered
+        self._add_placeholder_text(
+            "{NAZWA_EN}",
+            position=(0.5, 0.6),  # 60% wysokości (nieco poniżej środka)
+            fontsize=50
+        )
         messagebox.showinfo("Info",
                             "Dodano symbole zastępcze dla nazw PL i EN.\nZostaną one wypełnione danymi podczas tworzenia wideo.",
                             parent=self.dialog)
 
     def load_description_data(self):
-        """Adds a placeholder for the description."""
-        self._add_placeholder_text("{OPIS}")
+        """Adds a placeholder for the description at the bottom."""
+        self._add_placeholder_text(
+            "{OPIS}",
+            position=(0.5, 0.8),  # 80% wysokości (dolna część ekranu)
+            fontsize=40,
+            wrap_width=self.canvas_width - 40
+        )
         messagebox.showinfo("Info", "Dodano symbol zastępczy dla opisu.", parent=self.dialog)
 
     def load_materials_data(self):
-        """Adds a placeholder for materials."""
-        self._add_placeholder_text("{MATERIALY}")
+        """Adds a placeholder for materials at the very bottom."""
+        self._add_placeholder_text(
+            "{MATERIALY}",
+            position=(0.5, 0.9),  # 90% wysokości (bardzo nisko)
+            fontsize=35,
+            wrap_width=self.canvas_width - 40
+        )
         messagebox.showinfo("Info", "Dodano symbol zastępczy dla materiałów.", parent=self.dialog)
-
-    # ZMIANA: Zmieniono nazwę i logikę funkcji, aby dodawała dowolny tekst (w tym symbol zastępczy).
-    def _add_placeholder_text(self, placeholder_text):
-        """Adds a new text entry with the given placeholder text."""
-        # Użyj długości listy jako offset, aby teksty nie nakładały się na siebie
-        default_start_time = len(self.texts_data) * 2
-
-        new_text_data = {
-            'text': placeholder_text,  # Wstawiamy symbol jako tekst
-            'config': {
-                'fontsize': 40, 'color': 'white', 'movement': 'static',
-                'opacity': 0.9, 'position': ('center', 'center'),
-                'start_time': default_start_time, 'duration': 5, 'font': 'Arial-Bold'
-            }
-        }
-        self.texts_data.append(new_text_data)
-        self.populate_texts_tree()
-        # Automatycznie zaznacz nowo dodany element
-        new_id = len(self.texts_data) - 1
-        self.texts_tree.selection_set(new_id)
-        self.texts_tree.focus(new_id)
 
     def skip_text_clicked(self):
         video_path = self.video_var.get().strip()
@@ -148,7 +158,6 @@ class VideoConfigDialog:
             messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
             return
 
-        # Ustaw pustą listę tekstów
         self.texts_data = []
 
         if self.is_image:
@@ -158,8 +167,6 @@ class VideoConfigDialog:
             self.result = (video_path, self.texts_data, None)
         self.dialog.destroy()
 
-    # Reszta pliku pozostaje bez zmian...
-    # ... (cała reszta kodu z gui_elements.py)
     def setup_texts_tree(self, parent):
         tree_frame = ttk.Frame(parent)
         tree_frame.grid(row=3, column=0, sticky='nswe')
@@ -292,9 +299,7 @@ class VideoConfigDialog:
             self.toggle_config_controls_state(disabled=True)
             return
 
-        # The 'iid' of the selected item is its index in the list
         self.selected_text_id = int(selection[0])
-
         self.toggle_config_controls_state(disabled=False)
         self.load_config_for_selected_text()
 
@@ -313,9 +318,19 @@ class VideoConfigDialog:
         self.start_time_var.set(config.get('start_time', 0))
         self.duration_var.set(config.get('duration', 0))
         self.movement_var.set(config.get('movement', 'static'))
-
         self.update_canvas(config.get('position'), config.get('movement'))
+        pos = config.get('position')
+        if (isinstance(pos, (tuple, list)) and len(pos) == 2 and
+                all(isinstance(p, (int, float)) for p in pos)):
 
+            # Jeśli wartości są w zakresie pikseli (stary format)
+            if (isinstance(pos[0], (int, float)) and isinstance(pos[1], (int, float)) and
+                    pos[0] > 1.0 and pos[1] > 1.0 and
+                    pos[0] <= self.canvas_width and pos[1] <= self.canvas_height):
+                x_percent = pos[0] / self.canvas_width
+                y_percent = pos[1] / self.canvas_height
+                config['position'] = (x_percent, y_percent)
+                self.texts_data[self.selected_text_id]['config']['position'] = (x_percent, y_percent)
     def update_selected_text_data(self, event=None):
         if self.selected_text_id is None or self.selected_text_id >= len(self.texts_data):
             return
@@ -380,23 +395,24 @@ class VideoConfigDialog:
             self.update_selected_text_data()
 
     def on_canvas_click(self, event):
-        if self.selected_text_id is None or self.movement_var.get() != 'static': return
-        x = max(0, min(event.x, self.canvas_width))
-        y = max(0, min(event.y, self.canvas_height))
+        if self.selected_text_id is None or self.movement_var.get() != 'static':
+            return
 
-        self.texts_data[self.selected_text_id]['config']['position'] = (x, y)
-        self.update_canvas((x, y), 'static')
+        # Przelicz kliknięcie na procenty
+        x_percent = max(0, min(event.x, self.canvas_width)) / self.canvas_width
+        y_percent = max(0, min(event.y, self.canvas_height)) / self.canvas_height
+
+        self.texts_data[self.selected_text_id]['config']['position'] = (x_percent, y_percent)
+        self.update_canvas((x_percent, y_percent), 'static')
 
     def update_canvas(self, pos, movement):
         self.position_canvas.delete("marker")
         if movement == 'static':
             self.position_canvas.config(state=tk.NORMAL, cursor='crosshair', bg='#222222')
-            if pos and isinstance(pos, (tuple, list)):
-                x_val, y_val = pos
-
-                x = self.canvas_width / 2 if x_val == 'center' else x_val
-                y = self.canvas_height / 2 if y_val == 'center' else y_val
-
+            if pos and isinstance(pos, (tuple, list)) and len(pos) == 2:
+                # Przelicz procenty na piksele canvas
+                x = pos[0] * self.canvas_width
+                y = pos[1] * self.canvas_height
                 if isinstance(x, (int, float)) and isinstance(y, (int, float)):
                     self.position_canvas.create_line(x - 8, y, x + 8, y, fill='red', tags="marker", width=2)
                     self.position_canvas.create_line(x, y - 8, x, y + 8, fill='red', tags="marker", width=2)
@@ -424,12 +440,10 @@ class VideoConfigDialog:
                     child.configure(state=state)
                 except tk.TclError:
                     pass
-
         if disabled or self.movement_var.get() != 'static':
             self.position_canvas.config(state=tk.DISABLED, bg='grey')
         else:
             self.position_canvas.config(state=tk.NORMAL, bg='#222222')
-
         if disabled:
             self.config_frame.config(text="Text Configuration (select a text to edit)")
         elif self.selected_text_id is not None:
@@ -440,8 +454,6 @@ class VideoConfigDialog:
         if not video_path or not os.path.exists(video_path):
             messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
             return
-
-        # Tekst jest opcjonalny - akceptuj nawet jeśli lista tekstów jest pusta
         if self.is_image:
             duration = self.image_duration_var.get()
             self.result = (video_path, self.texts_data, duration)
@@ -455,6 +467,7 @@ class VideoConfigDialog:
 
 
 class TemplateConfigDialog:
+    # ... (Ta klasa pozostaje bez zmian) ...
     def __init__(self, parent, title, clips_data=None):
         self.parent = parent
         self.clips_data = copy.deepcopy(clips_data) if clips_data is not None else []
