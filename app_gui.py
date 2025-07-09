@@ -2,12 +2,13 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
 import subprocess
+import re  # <-- DODANY IMPORT
 
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import threading
 from video_merger import VideoMerger
 from gui_elements import VideoConfigDialog, TemplateConfigDialog
-import data_load  # Potrzebne do nowej funkcji
+import data_load
 
 
 class VideoMergerGUI:
@@ -23,10 +24,9 @@ class VideoMergerGUI:
 
         self.load_template()
         self.setup_ui()
-        self.update_file_list()  # Zaktualizuj listę po załadowaniu szablonu
+        self.update_file_list()
 
     def setup_ui(self):
-        # Create menu bar
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         template_menu = tk.Menu(menubar, tearoff=0)
@@ -43,36 +43,27 @@ class VideoMergerGUI:
         title_label = ttk.Label(main_frame, text="Video Merger", font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 10))
 
-        # --- Ramka na indeks produktu z nowym przyciskiem ---
         index_frame = ttk.Frame(main_frame)
         index_frame.grid(row=1, column=0, columnspan=3, pady=(0, 10), sticky="ew")
-        index_frame.columnconfigure(1, weight=1)  # Pozwala polu Entry się rozszerzać
+        index_frame.columnconfigure(1, weight=1)
 
         ttk.Label(index_frame, text="Indeks produktu:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Entry(index_frame, textvariable=self.item_no_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        # NOWY PRZYCISK
         ttk.Button(index_frame, text="Załaduj dane", command=self.reload_all_data).pack(side=tk.LEFT, padx=5)
-
         ttk.Button(index_frame, text="Odśwież dane", command=self.reload_excel).pack(side=tk.LEFT, padx=5)
 
         self.setup_video_list(main_frame)
         self.setup_control_buttons(main_frame)
         self.setup_output_settings(main_frame)
-
         self.setup_progress_area(main_frame)
 
     def reload_all_data(self):
-        """
-        Loads data for the given index and replaces placeholders in all clips
-        (templates and user-added clips).
-        """
         item_no = self.item_no_var.get().strip()
         if not item_no:
             messagebox.showerror("Brak Indeksu", "Proszę podać indeks produktu przed załadowaniem danych.",
                                  parent=self.root)
             return
 
-        # Ostrzeżenie dla użytkownika o trwałej zmianie
         confirm = messagebox.askyesno(
             "Potwierdzenie",
             "Ta operacja podmieni wszystkie symbole (np. {OPIS}, {indeks}) na dane z nowego indeksu we wszystkich klipach, także w szablonach.\n\n"
@@ -82,13 +73,11 @@ class VideoMergerGUI:
         if not confirm:
             return
 
-        # 1. Wczytaj wszystkie dane dla danego indeksu
         try:
             names = data_load.load_names(item_no)
             description = data_load.load_description(item_no)
             materials = data_load.load_materials(item_no)
 
-            # Słownik mapujący symbole na dane. Klucze muszą być wielkimi literami.
             data_map = {
                 "{INDEKS}": item_no,
                 "{NAZWA_PL}": names.get("PL", "Brak nazwy PL"),
@@ -101,27 +90,26 @@ class VideoMergerGUI:
                                  parent=self.root)
             return
 
-        # 2. Funkcja pomocnicza do aktualizacji tekstów w liście klipów
+        # --- ZMIENIONA FUNKCJA WEWNĘTRZNA ---
+        # Nowa logika, która skanuje tekst i zamienia wszystkie znalezione symbole.
         def update_clip_texts(clips_list):
             for clip in clips_list:
                 for text_info in clip.get('texts', []):
-                    # Sprawdzanie symbolu jest niewrażliwe na wielkość liter
-                    placeholder = text_info.get('text', '').strip().upper()
-                    if placeholder in data_map:
-                        # Zamień symbol na wczytaną wartość
-                        text_info['text'] = data_map[placeholder]
+                    current_text = text_info.get('text', '')
+                    # Pętla po wszystkich symbolach i zamiana każdego z nich w tekście
+                    for placeholder, value in data_map.items():
+                        # Używamy re.sub do zamiany bez względu na wielkość liter
+                        current_text = re.sub(re.escape(placeholder), str(value), current_text, flags=re.IGNORECASE)
+                    text_info['text'] = current_text
 
-        # 3. Zaktualizuj wszystkie listy klipów: szablony i listę roboczą
+        # --- KONIEC ZMIANY ---
+
         update_clip_texts(self.pre_template_clips)
         update_clip_texts(self.post_template_clips)
         update_clip_texts(self.merger.clips_data)
 
-        # 4. Odśwież widok i poinformuj o sukcesie
         self.update_file_list()
-
-        # ** Zmiana nazwy pliku wyjściowego na podstawie indeksu **
-        self.output_var.set(f"{item_no}.mp4")  # Zmieniamy nazwę pliku na przekazany indeks (item_no)
-
+        self.output_var.set(f"{item_no}.mp4")
         messagebox.showinfo("Sukces", "Dane zostały pomyślnie zaktualizowane we wszystkich klipach.", parent=self.root)
 
     def setup_video_list(self, parent):
@@ -130,11 +118,9 @@ class VideoMergerGUI:
 
         columns = ('Order', 'File', 'Text Overlays')
         self.tree = ttk.Treeview(parent, columns=columns, show='headings', height=10)
-
         self.tree.heading('Order', text='#')
         self.tree.heading('File', text='File')
         self.tree.heading('Text Overlays', text='Text Overlays')
-
         self.tree.column('Order', width=50, anchor='center', stretch=tk.NO)
         self.tree.column('File', width=400)
         self.tree.column('Text Overlays', width=150, anchor='center')
@@ -146,31 +132,18 @@ class VideoMergerGUI:
         parent.rowconfigure(3, weight=1)
 
     def merge_files_thread(self, output_path, item_no, progress_callback):
-        # Logika tworzenia pełnej listy klipów do scalenia
         user_clips_start_index = len(self.pre_template_clips)
-        # Klipy użytkownika to te w merger.clips_data, które nie są pre_clips
         user_clips = self.merger.clips_data[user_clips_start_index:]
-
-        # Tworzymy pełną listę na nowo z aktualnych danych
         full_clips = self.pre_template_clips + user_clips + self.post_template_clips
 
         temp_merger = VideoMerger()
         for clip in full_clips:
-            temp_merger.add_clip(
-                clip['path'],
-                clip['texts'],
-                clip.get('image_duration')
-            )
+            temp_merger.add_clip(clip['path'], clip['texts'], clip.get('image_duration'))
 
-        success, message = temp_merger.merge_videos(
-            output_path,
-            item_no,
-            progress_callback
-        )
+        success, message = temp_merger.merge_videos(output_path, item_no, progress_callback)
         self.root.after(0, lambda: self.merge_complete(success, message))
 
     def start_merge_process(self):
-        # Upewnij się, że w mergerze są klipy użytkownika, oprócz szablonów
         user_clips_count = len(self.merger.clips_data) - len(self.pre_template_clips)
         if not self.pre_template_clips and not self.post_template_clips and user_clips_count == 0:
             messagebox.showwarning("No Files", "Please add at least one video or image.")
@@ -182,7 +155,6 @@ class VideoMergerGUI:
         self.progress_bar['value'] = 0
         self.progress_bar['mode'] = 'determinate'
         self.status_var.set("Processing...")
-
         item_no = self.item_no_var.get().strip()
         thread = threading.Thread(
             target=self.merge_files_thread,
@@ -200,13 +172,8 @@ class VideoMergerGUI:
         if success:
             self.pre_template_clips = result.get('pre_clips', [])
             self.post_template_clips = result.get('post_clips', [])
-            # Dodaj pre-clips do głównej listy roboczej
             for clip in self.pre_template_clips:
-                self.merger.add_clip(
-                    clip['path'],
-                    clip['texts'],
-                    clip.get('image_duration')
-                )
+                self.merger.add_clip(clip['path'], clip['texts'], clip.get('image_duration'))
         else:
             print(result)
 
@@ -215,7 +182,7 @@ class VideoMergerGUI:
         self.root.wait_window(dialog.dialog)
         if dialog.result is not None:
             self.pre_template_clips = dialog.result
-            if getattr(dialog, 'save_requested', True):  # domyślnie True
+            if getattr(dialog, 'save_requested', True):
                 self.update_template()
 
     def edit_post_clips_template(self):
@@ -230,7 +197,7 @@ class VideoMergerGUI:
         success, message = self.template_manager.save_template(self.pre_template_clips, self.post_template_clips)
         if success:
             messagebox.showinfo("Success", message)
-            self.load_template()  # Przeładuj szablony do widoku
+            self.load_template()
             self.update_file_list()
         else:
             messagebox.showerror("Error", message)
@@ -274,7 +241,6 @@ class VideoMergerGUI:
         )
         if not path: return
 
-        # Predefiniowane napisy, które pojawią się przy dodaniu nowego klipu
         initial_texts = [
             {
                 'text': '{indeks}',
@@ -304,8 +270,8 @@ class VideoMergerGUI:
 
         item_no_from_main = self.item_no_var.get().strip()
         is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
-        dialog = VideoConfigDialog(self.root, "Dodaj/Edytuj tekst na klipie", video_path=path,
-                                   texts_data=initial_texts, is_image=is_image, item_no=item_no_from_main)
+        dialog = VideoConfigDialog(self.root, "Dodaj/Edytuj tekst na klipie", video_path=path, texts_data=initial_texts,
+                                   is_image=is_image, item_no=item_no_from_main)
         self.root.wait_window(dialog.dialog)
         if dialog.result:
             path, texts_data, duration = dialog.result
@@ -320,7 +286,7 @@ class VideoMergerGUI:
         item = selection[0]
         index = self.tree.index(item)
         clip_index = index + len(self.pre_template_clips)
-        if clip_index >= len(self.merger.clips_data): return  # Safety check
+        if clip_index >= len(self.merger.clips_data): return
         clip_data = self.merger.clips_data[clip_index]
         dialog = VideoConfigDialog(self.root, "Add/Edit Text on Clip",
                                    video_path=clip_data['path'], texts_data=clip_data['texts'],
@@ -349,7 +315,6 @@ class VideoMergerGUI:
         for item in selection:
             index = self.tree.index(item)
             adjusted_index = index + len(self.pre_template_clips)
-            # Pozwól przesuwać tylko w obrębie klipów użytkownika
             if adjusted_index > len(self.pre_template_clips):
                 self.merger.clips_data.insert(adjusted_index - 1, self.merger.clips_data.pop(adjusted_index))
         self.update_file_list()
@@ -360,7 +325,6 @@ class VideoMergerGUI:
         user_clips_count = len(self.merger.clips_data) - len(self.pre_template_clips)
         for item in reversed(selection):
             index = self.tree.index(item)
-            # Sprawdź, czy nie jest to ostatni klip użytkownika
             if index < user_clips_count - 1:
                 adjusted_index = index + len(self.pre_template_clips)
                 self.merger.clips_data.insert(adjusted_index + 1, self.merger.clips_data.pop(adjusted_index))
@@ -370,7 +334,6 @@ class VideoMergerGUI:
         user_clips_exist = len(self.merger.clips_data) > len(self.pre_template_clips)
         if user_clips_exist and messagebox.askyesno("Confirm Clear",
                                                     "Are you sure you want to clear all non-template files?"):
-            # Usuń tylko klipy użytkownika, zachowaj szablony
             self.merger.clips_data = self.merger.clips_data[:len(self.pre_template_clips)]
             self.update_file_list()
 
@@ -379,7 +342,6 @@ class VideoMergerGUI:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        # Wyświetlaj tylko klipy dodane przez użytkownika
         start_idx = len(self.pre_template_clips)
         for i, clip_data in enumerate(self.merger.clips_data[start_idx:]):
             filename = os.path.basename(clip_data['path'])
@@ -418,52 +380,30 @@ class VideoMergerGUI:
         self.status_var.set("Ready" if success else "Merge Failed!")
         if success:
             messagebox.showinfo("Success", message)
-            # Przeładuj szablon i zaktualizuj listę plików po pomyślnym scaleniu
             self.load_template()
             self.update_file_list()
         else:
             messagebox.showerror("Error", message)
 
     def reload_excel(self, arguments=None, wait=True, capture_output=False):
-        """
-        Uruchamia plik wykonywalny (.exe) z opcjonalnymi argumentami
-
-        :param exe_path: Ścieżka do pliku .exe
-        :param arguments: Lista argumentów jako stringi (opcjonalnie)
-        :param wait: Czy czekać na zakończenie procesu (domyślnie True)
-        :param capture_output: Przechwytywanie outputu (domyślnie False)
-        :return: Obiekt CompletedProcess lub Popen w zależności od parametru wait
-        """
         exe_path = "pobieranie_danych_z_nav.exe"
-        # Sprawdź czy plik istnieje
         if not os.path.exists(exe_path):
             raise FileNotFoundError(f"Plik '{exe_path}' nie istnieje!")
 
-        # Przygotuj komendę
         command = [exe_path]
         if arguments:
             command.extend(arguments)
 
         try:
-            # Uruchom proces
             if wait:
                 if capture_output:
-                    # Uruchom i przechwyć output
-                    result = subprocess.run(
-                        command,
-                        check=True,
-                        text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
+                    result = subprocess.run(command, check=True, text=True, stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE)
                     return result
                 else:
-                    # Uruchom bez przechwytywania outputu
                     return subprocess.run(command, check=True)
             else:
-                # Uruchom bez oczekiwania na zakończenie
                 return subprocess.Popen(command)
-
         except subprocess.CalledProcessError as e:
             print(f"Błąd podczas uruchamiania: {e}")
             if capture_output:
