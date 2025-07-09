@@ -25,7 +25,7 @@ class VideoConfigDialog:
         self.item_no_var = tk.StringVar()
         # Ustawia wartość pola na podstawie przekazanego indeksu
         self.item_no_var.set(item_no)
-
+        self.save_requested = True  # domyślne
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(title)
         self.dialog.geometry("800x700")
@@ -101,8 +101,8 @@ class VideoConfigDialog:
                 'movement': 'static',
                 'opacity': 0.9,
                 'position': position,
-                'start_time': default_start_time,
-                'duration': 5,
+                'start_time': 0.0,
+                'duration': 0.0,
                 'font': 'Arial-Bold',
                 'wrap_width': wrap_width  # Add wrapping capability
             }
@@ -368,7 +368,7 @@ class VideoConfigDialog:
             'config': {
                 'fontsize': 50, 'color': 'white', 'movement': 'static',
                 'opacity': 0.8, 'position': center_pos,
-                'start_time': 0, 'duration': 5, 'font': 'Arial-Bold'
+                'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
             }
         }
         self.texts_data.append(new_text_data)
@@ -483,6 +483,7 @@ class TemplateConfigDialog:
         self.update_file_list()
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
 
+
     def setup_dialog_ui(self):
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -520,6 +521,27 @@ class TemplateConfigDialog:
 
         bottom_button_frame = ttk.Frame(main_frame)
         bottom_button_frame.grid(row=4, column=0, columnspan=3, pady=(10, 0), sticky="e")
+        self.should_save_template = tk.BooleanVar(value=False)
+
+
+
+
+        def on_toggle_save():
+            if self.should_save_template.get():
+                confirm = messagebox.askyesno(
+                    "Potwierdzenie zapisu",
+                    "Czy na pewno chcesz zapisać zmiany do pliku szablonu?",
+                    parent=self.dialog
+                )
+                if not confirm:
+                    self.should_save_template.set(False)
+
+        tk.Checkbutton(
+            bottom_button_frame,
+            text="Zapisz zmiany do pliku",
+            variable=self.should_save_template,
+            command=on_toggle_save
+        ).pack(side=tk.LEFT, padx=(10, 20))
         ttk.Button(bottom_button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(bottom_button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
 
@@ -625,6 +647,7 @@ class TemplateConfigDialog:
 
     def ok_clicked(self):
         self.result = self.clips_data
+        self.save_requested = self.should_save_template.get()  # <-- dodane
         self.dialog.destroy()
 
     def cancel_clicked(self):

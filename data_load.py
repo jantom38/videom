@@ -1,5 +1,6 @@
 import pandas as pd
 
+# plik obsługujący ładowanie danych z bazy
 
 def load_description(item_no):
     df = pd.read_excel("dane_z_nav.xlsx", sheet_name="Indeksy")

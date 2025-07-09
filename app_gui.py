@@ -55,7 +55,6 @@ class VideoMergerGUI:
 
         ttk.Button(index_frame, text="Odśwież dane", command=self.reload_excel).pack(side=tk.LEFT, padx=5)
 
-
         self.setup_video_list(main_frame)
         self.setup_control_buttons(main_frame)
         self.setup_output_settings(main_frame)
@@ -76,7 +75,7 @@ class VideoMergerGUI:
         # Ostrzeżenie dla użytkownika o trwałej zmianie
         confirm = messagebox.askyesno(
             "Potwierdzenie",
-            "Ta operacja podmieni wszystkie symbole (np. {OPIS}) na dane z nowego indeksu we wszystkich klipach, także w szablonach.\n\n"
+            "Ta operacja podmieni wszystkie symbole (np. {OPIS}, {indeks}) na dane z nowego indeksu we wszystkich klipach, także w szablonach.\n\n"
             "Jeśli zapiszesz szablon po tej operacji, symbole zostaną trwale nadpisane. Czy chcesz kontynuować?",
             parent=self.root
         )
@@ -89,7 +88,9 @@ class VideoMergerGUI:
             description = data_load.load_description(item_no)
             materials = data_load.load_materials(item_no)
 
+            # Słownik mapujący symbole na dane. Klucze muszą być wielkimi literami.
             data_map = {
+                "{INDEKS}": item_no,
                 "{NAZWA_PL}": names.get("PL", "Brak nazwy PL"),
                 "{NAZWA_EN}": names.get("EN", "Brak nazwy EN"),
                 "{OPIS}": description,
@@ -104,6 +105,7 @@ class VideoMergerGUI:
         def update_clip_texts(clips_list):
             for clip in clips_list:
                 for text_info in clip.get('texts', []):
+                    # Sprawdzanie symbolu jest niewrażliwe na wielkość liter
                     placeholder = text_info.get('text', '').strip().upper()
                     if placeholder in data_map:
                         # Zamień symbol na wczytaną wartość
@@ -213,14 +215,16 @@ class VideoMergerGUI:
         self.root.wait_window(dialog.dialog)
         if dialog.result is not None:
             self.pre_template_clips = dialog.result
-            self.update_template()
+            if getattr(dialog, 'save_requested', True):  # domyślnie True
+                self.update_template()
 
     def edit_post_clips_template(self):
         dialog = TemplateConfigDialog(self.root, "Edit Post-Clips Template", clips_data=self.post_template_clips)
         self.root.wait_window(dialog.dialog)
         if dialog.result is not None:
             self.post_template_clips = dialog.result
-            self.update_template()
+            if getattr(dialog, 'save_requested', True):
+                self.update_template()
 
     def update_template(self):
         success, message = self.template_manager.save_template(self.pre_template_clips, self.post_template_clips)
@@ -269,10 +273,39 @@ class VideoMergerGUI:
             filetypes=[("Video/Image", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png")]
         )
         if not path: return
+
+        # Predefiniowane napisy, które pojawią się przy dodaniu nowego klipu
+        initial_texts = [
+            {
+                'text': '{indeks}',
+                'config': {
+                    'fontsize': 30, 'color': 'white', 'movement': 'static',
+                    'opacity': 0.9, 'position': (0.15, 0.15),  # Lewy górny róg
+                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                }
+            },
+            {
+                'text': '{NAZWA_PL}',
+                'config': {
+                    'fontsize': 30, 'color': 'white', 'movement': 'static',
+                    'opacity': 0.9, 'position': (0.25, 0.1),  # Lewy górny róg
+                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                }
+            },
+            {
+                'text': 'vive.com',
+                'config': {
+                    'fontsize': 30, 'color': 'white', 'movement': 'static',
+                    'opacity': 0.9, 'position': (0.85, 0.95),  # Prawy dolny róg
+                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                }
+            }
+        ]
+
         item_no_from_main = self.item_no_var.get().strip()
         is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
         dialog = VideoConfigDialog(self.root, "Dodaj/Edytuj tekst na klipie", video_path=path,
-                                   texts_data=[], is_image=is_image, item_no=item_no_from_main)
+                                   texts_data=initial_texts, is_image=is_image, item_no=item_no_from_main)
         self.root.wait_window(dialog.dialog)
         if dialog.result:
             path, texts_data, duration = dialog.result
@@ -385,8 +418,12 @@ class VideoMergerGUI:
         self.status_var.set("Ready" if success else "Merge Failed!")
         if success:
             messagebox.showinfo("Success", message)
+            # Przeładuj szablon i zaktualizuj listę plików po pomyślnym scaleniu
+            self.load_template()
+            self.update_file_list()
         else:
             messagebox.showerror("Error", message)
+
     def reload_excel(self, arguments=None, wait=True, capture_output=False):
         """
         Uruchamia plik wykonywalny (.exe) z opcjonalnymi argumentami
@@ -397,7 +434,7 @@ class VideoMergerGUI:
         :param capture_output: Przechwytywanie outputu (domyślnie False)
         :return: Obiekt CompletedProcess lub Popen w zależności od parametru wait
         """
-        exe_path="pobieranie_danych_z_nav.exe"
+        exe_path = "pobieranie_danych_z_nav.exe"
         # Sprawdź czy plik istnieje
         if not os.path.exists(exe_path):
             raise FileNotFoundError(f"Plik '{exe_path}' nie istnieje!")

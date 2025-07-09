@@ -7,7 +7,7 @@
             "image_duration": 5
         },
         {
-            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/animacja pion.mp4",
+            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/gotowe szablony/animacja pion.mp4",
             "texts": [],
             "is_image": false,
             "image_duration": null
@@ -18,61 +18,69 @@
                 {
                     "text": "{NAZWA_PL}",
                     "config": {
-                        "fontsize": 14,
+                        "fontsize": 50,
                         "color": "white",
                         "movement": "static",
                         "opacity": 0.9,
-                        "start_time": 0.0,
-                        "duration": 0.0,
                         "position": [
                             0.5,
-                            0.4
-                        ]
+                            0.5
+                        ],
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "font": "Arial-Bold",
+                        "wrap_width": null
                     }
                 },
                 {
                     "text": "{NAZWA_EN}",
                     "config": {
-                        "fontsize": 10,
+                        "fontsize": 30,
                         "color": "white",
                         "movement": "static",
                         "opacity": 0.9,
-                        "start_time": 0.0,
-                        "duration": 0.0,
                         "position": [
                             0.5,
                             0.6
-                        ]
+                        ],
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "font": "Arial-Bold",
+                        "wrap_width": null
                     }
                 },
                 {
                     "text": "{OPIS}",
                     "config": {
-                        "fontsize": 10,
+                        "fontsize": 20,
                         "color": "white",
                         "movement": "static",
                         "opacity": 0.9,
-                        "start_time": 0.0,
-                        "duration": 0.0,
                         "position": [
                             0.5,
                             0.8
-                        ]
+                        ],
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "font": "Arial-Bold",
+                        "wrap_width": 280
                     }
                 },
                 {
                     "text": "{MATERIALY}",
                     "config": {
-                        "fontsize": 10,
+                        "fontsize": 20,
                         "color": "white",
                         "movement": "static",
                         "opacity": 0.9,
-                        "start_time": 0.0,
-                        "duration": 0.0,
                         "position": [
                             0.5,
                             0.9
-                        ]
+                        ],
+                        "start_time": 0.0,
+                        "duration": 0.0,
+                        "font": "Arial-Bold",
+                        "wrap_width": 280
                     }
                 }
             ],
@@ -80,5 +88,18 @@
             "image_duration": 5
         }
     ],
-    "post_clips": []
+    "post_clips": [
+        {
+            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/gotowe szablony/animacja pion outro.mp4",
+            "texts": [],
+            "is_image": false,
+            "image_duration": null
+        },
+        {
+            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/temp 3 pion.png",
+            "texts": [],
+            "is_image": true,
+            "image_duration": 5
+        }
+    ]
 }
