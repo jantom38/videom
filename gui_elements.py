@@ -40,20 +40,20 @@ class VideoConfigDialog:
     def setup_dialog_ui(self, video_path):
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        main_frame.columnconfigure(1, weight=3)  # Give more space to config frame
+        main_frame.columnconfigure(1, weight=3)  # Daj więcej miejsca ramce konfiguracyjnej
         main_frame.rowconfigure(1, weight=1)
 
-        # --- Left Panel: File and Texts List ---
+        # --- Lewy Panel: Plik i Lista Tekstów ---
         left_panel = ttk.Frame(main_frame, padding="10")
         left_panel.grid(row=0, column=0, rowspan=2, sticky="nswe", padx=(0, 10))
         left_panel.rowconfigure(3, weight=1)
 
-        ttk.Label(left_panel, text="File:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        ttk.Label(left_panel, text="Plik:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
         self.video_var = tk.StringVar(value=video_path)
         ttk.Entry(left_panel, textvariable=self.video_var, state='readonly').grid(row=1, column=0, sticky="ew",
                                                                                   pady=(0, 10))
 
-        ttk.Label(left_panel, text="Text Overlays:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W,
+        ttk.Label(left_panel, text="Nakładki tekstowe:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W,
                                                                                       pady=(0, 5))
         self.setup_texts_tree(left_panel)
         self.setup_text_buttons(left_panel)
@@ -73,21 +73,20 @@ class VideoConfigDialog:
         ttk.Button(button_import_frame, text="Opis", command=self.load_description_data).pack(side=tk.LEFT, padx=2)
         ttk.Button(button_import_frame, text="Materiały", command=self.load_materials_data).pack(side=tk.LEFT, padx=2)
 
-        # --- Right Panel: Configuration ---
-        self.config_frame = ttk.LabelFrame(main_frame, text="Text Configuration (select a text to edit)", padding="15")
+        # --- Prawy Panel: Konfiguracja ---
+        self.config_frame = ttk.LabelFrame(main_frame, text="Konfiguracja tekstu (wybierz tekst do edycji)", padding="15")
         self.config_frame.grid(row=0, column=1, rowspan=2, sticky="nswe")
         self.config_frame.columnconfigure(1, weight=1)
         self.setup_config_controls(self.config_frame)
 
-        # --- Bottom Buttons ---
+        # --- Dolne Przyciski ---
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=2, column=0, columnspan=2, pady=(10, 0), sticky="e")
         ttk.Button(button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
-        ttk.Button(button_frame, text="Skip Text", command=self.skip_text_clicked).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Button(button_frame, text="Anuluj", command=self.cancel_clicked).pack(side=tk.LEFT)
 
     def _add_placeholder_text(self, placeholder_text, position=None, fontsize=50, wrap_width=None):
-        """Adds a new text entry with the given placeholder text and positioning."""
+        """Dodaje nowy wpis tekstowy z podanym tekstem zastępczym i pozycjonowaniem."""
         default_start_time = len(self.texts_data) * 2
 
         if position is None:
@@ -105,7 +104,7 @@ class VideoConfigDialog:
                 'alignment': 'center',
                 'duration': 0.0,
                 'font': 'Arial-Bold',
-                'wrap_width': wrap_width  # Add wrapping capability
+                'wrap_width': wrap_width  # Dodaje możliwość zawijania tekstu
             }
         }
         self.texts_data.append(new_text_data)
@@ -116,47 +115,47 @@ class VideoConfigDialog:
             self.texts_tree.focus(new_id)
 
     def load_names_data(self):
-        """Adds placeholders for Polish and English names with centered positioning."""
-        # Polish name - centered
+        """Dodaje symbole zastępcze dla polskiej i angielskiej nazwy z wyśrodkowanym pozycjonowaniem."""
+        # Nazwa polska - wyśrodkowana
         self._add_placeholder_text(
             "{NAZWA_PL}",
             position=(0.5, 0.4),  # 40% wysokości (nieco powyżej środka)
             fontsize=60
         )
-        # English name - centered
+        # Nazwa angielska - wyśrodkowana
         self._add_placeholder_text(
             "{NAZWA_EN}",
             position=(0.5, 0.6),  # 60% wysokości (nieco poniżej środka)
             fontsize=50
         )
-        messagebox.showinfo("Info",
+        messagebox.showinfo("Informacja",
                             "Dodano symbole zastępcze dla nazw PL i EN.\nZostaną one wypełnione danymi podczas tworzenia wideo.",
                             parent=self.dialog)
 
     def load_description_data(self):
-        """Adds a placeholder for the description at the bottom."""
+        """Dodaje symbol zastępczy dla opisu na dole."""
         self._add_placeholder_text(
             "{OPIS}",
             position=(0.5, 0.8),  # 80% wysokości (dolna część ekranu)
             fontsize=40,
             wrap_width=self.canvas_width - 40
         )
-        messagebox.showinfo("Info", "Dodano symbol zastępczy dla opisu.", parent=self.dialog)
+        messagebox.showinfo("Informacja", "Dodano symbol zastępczy dla opisu.", parent=self.dialog)
 
     def load_materials_data(self):
-        """Adds a placeholder for materials at the very bottom."""
+        """Dodaje symbol zastępczy dla materiałów na samym dole."""
         self._add_placeholder_text(
             "{MATERIALY}",
             position=(0.5, 0.9),  # 90% wysokości (bardzo nisko)
             fontsize=35,
             wrap_width=self.canvas_width - 40
         )
-        messagebox.showinfo("Info", "Dodano symbol zastępczy dla materiałów.", parent=self.dialog)
+        messagebox.showinfo("Informacja", "Dodano symbol zastępczy dla materiałów.", parent=self.dialog)
 
     def skip_text_clicked(self):
         video_path = self.video_var.get().strip()
         if not video_path or not os.path.exists(video_path):
-            messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
+            messagebox.showerror("Błąd", "Proszę wybrać prawidłowy plik.", parent=self.dialog)
             return
 
         self.texts_data = []
@@ -177,8 +176,8 @@ class VideoConfigDialog:
         columns = ('#', 'Text', 'Time')
         self.texts_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=10)
         self.texts_tree.heading('#', text='#', anchor='w')
-        self.texts_tree.heading('Text', text='Text Content')
-        self.texts_tree.heading('Time', text='Timing (s)')
+        self.texts_tree.heading('Text', text='Treść tekstu')
+        self.texts_tree.heading('Time', text='Czas (s)')
         self.texts_tree.column('#', width=30, stretch=tk.NO, anchor='w')
         self.texts_tree.column('Text', width=120)
         self.texts_tree.column('Time', width=80)
@@ -193,21 +192,21 @@ class VideoConfigDialog:
     def setup_text_buttons(self, parent):
         button_frame = ttk.Frame(parent)
         button_frame.grid(row=4, column=0, pady=(10, 0))
-        ttk.Button(button_frame, text="Add", command=self.add_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Remove", command=self.remove_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Dodaj", command=self.add_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Usuń", command=self.remove_text).pack(side=tk.LEFT, padx=5)
 
     def setup_config_controls(self, parent_frame):
         row = 0
-        # Text Content
-        ttk.Label(parent_frame, text="Text:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Treść tekstu
+        ttk.Label(parent_frame, text="Tekst:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.text_widget = ScrolledText(parent_frame, height=4, wrap='word')
         self.text_widget.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
         self.text_widget.bind("<KeyRelease>", self.update_selected_text_data)
         self.text_widget.bind("<Control-Return>", lambda e: self.ok_clicked())  # skrót klawiszowy Ctrl+Enter
         row += 1
 
-        # Font Size
-        ttk.Label(parent_frame, text="Font Size:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Rozmiar czcionki
+        ttk.Label(parent_frame, text="Rozmiar czcionki:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.fontsize_var = tk.IntVar(value=50)
         scale = ttk.Scale(parent_frame, from_=10, to=200, variable=self.fontsize_var, orient=tk.HORIZONTAL,
                           command=self.update_selected_text_data)
@@ -215,27 +214,26 @@ class VideoConfigDialog:
         ttk.Label(parent_frame, textvariable=self.fontsize_var).grid(row=row, column=2, padx=5)
         row += 1
 
-        # Color
-        ttk.Label(parent_frame, text="Color:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Kolor
+        ttk.Label(parent_frame, text="Kolor:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.color_var = tk.StringVar(value='white')
         color_entry = ttk.Entry(parent_frame, textvariable=self.color_var)
         color_entry.grid(row=row, column=1, sticky="ew")
         color_entry.bind("<KeyRelease>", self.update_selected_text_data)
-        ttk.Button(parent_frame, text="Choose", command=self.choose_color).grid(row=row, column=2, padx=5)
+        ttk.Button(parent_frame, text="Wybierz", command=self.choose_color).grid(row=row, column=2, padx=5)
         row += 1
 
-        # Background Color
-        ttk.Label(parent_frame, text="BG color:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Kolor tła
+        ttk.Label(parent_frame, text="Kolor tła:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.bg_color_var = tk.StringVar(value='')  # pusty = brak tła
         self.bg_entry = ttk.Entry(parent_frame, textvariable=self.bg_color_var)
         self.bg_entry.grid(row=row, column=1, sticky="ew")
         self.bg_entry.bind("<KeyRelease>", self.update_selected_text_data)
-        ttk.Button(parent_frame, text="Choose", command=self.choose_bg_color).grid(row=row, column=2, padx=5)
+        ttk.Button(parent_frame, text="Wybierz", command=self.choose_bg_color).grid(row=row, column=2, padx=5)
         row += 1
 
-
-        # Opacity
-        ttk.Label(parent_frame, text="Opacity:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Krycie
+        ttk.Label(parent_frame, text="Krycie:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.opacity_var = tk.DoubleVar(value=0.8)
         scale = ttk.Scale(parent_frame, from_=0.0, to=1.0, variable=self.opacity_var, orient=tk.HORIZONTAL,
                           command=self.update_selected_text_data)
@@ -244,38 +242,38 @@ class VideoConfigDialog:
         self.opacity_label.grid(row=row, column=2, padx=5)
         row += 1
 
-        # Timing
-        timing_frame = ttk.LabelFrame(parent_frame, text="Timing", padding=10)
+        # Czas
+        timing_frame = ttk.LabelFrame(parent_frame, text="Czas", padding=10)
         timing_frame.grid(row=row, column=0, columnspan=3, sticky="ew", pady=10)
         timing_frame.columnconfigure(1, weight=1)
         timing_frame.columnconfigure(3, weight=1)
 
-        ttk.Label(timing_frame, text="Start (s):").grid(row=0, column=0, padx=5)
+        ttk.Label(timing_frame, text="Początek (s):").grid(row=0, column=0, padx=5)
         self.start_time_var = tk.DoubleVar(value=0)
         start_spin = ttk.Spinbox(timing_frame, from_=0, to=9999, increment=0.1, textvariable=self.start_time_var,
                                  command=self.update_selected_text_data, width=8)
         start_spin.grid(row=0, column=1, sticky="ew")
         start_spin.bind("<KeyRelease>", self.update_selected_text_data)
 
-        ttk.Label(timing_frame, text="Duration (s):").grid(row=0, column=2, padx=5)
+        ttk.Label(timing_frame, text="Czas trwania (s):").grid(row=0, column=2, padx=5)
         self.duration_var = tk.DoubleVar(value=0)
         dur_spin = ttk.Spinbox(timing_frame, from_=0, to=9999, increment=0.1, textvariable=self.duration_var,
                                command=self.update_selected_text_data, width=8)
         dur_spin.grid(row=0, column=3, sticky="ew")
         dur_spin.bind("<KeyRelease>", self.update_selected_text_data)
-        ttk.Label(timing_frame, text="(0=full clip)").grid(row=1, column=2, columnspan=2, sticky='w', padx=5)
+        ttk.Label(timing_frame, text="(0=cały klip)").grid(row=1, column=2, columnspan=2, sticky='w', padx=5)
         row += 1
 
-        # Movement
-        ttk.Label(parent_frame, text="Animation:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Ruch
+        ttk.Label(parent_frame, text="Animacja:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.movement_var = tk.StringVar(value='static')
         self.movement_combo = ttk.Combobox(parent_frame, textvariable=self.movement_var,
                                            values=['static', 'bounce', 'slide', 'float'], state='readonly')
         self.movement_combo.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
         self.movement_combo.bind("<<ComboboxSelected>>", self.update_selected_text_data)
         row += 1
-        # Alignment
-        ttk.Label(parent_frame, text="Alignment:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Wyrównanie
+        ttk.Label(parent_frame, text="Wyrównanie:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.alignment_var = tk.StringVar(value='center')
         self.alignment_combo = ttk.Combobox(
             parent_frame,
@@ -287,27 +285,36 @@ class VideoConfigDialog:
         self.alignment_combo.bind("<<ComboboxSelected>>", self.update_selected_text_data)
         row += 1
 
+        # Szerokość zawijania
+        ttk.Label(parent_frame, text="Szerokość zawijania (px):").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.wrap_width_var = tk.IntVar(value=0)
+        wrap_spin = ttk.Spinbox(parent_frame, from_=0, to=9999, increment=10, textvariable=self.wrap_width_var,
+                                command=self.update_selected_text_data, width=10)
+        wrap_spin.grid(row=row, column=1, sticky="ew")
+        wrap_spin.bind("<KeyRelease>", lambda e: self.update_selected_text_data())
+        ttk.Label(parent_frame, text="(0 = bez zawijania)").grid(row=row, column=2, sticky='w', padx=5)
+        row += 1
 
-        # Position
-        ttk.Label(parent_frame, text="Position:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        # Pozycja
+        ttk.Label(parent_frame, text="Pozycja:").grid(row=row, column=0, sticky=tk.W, pady=5)
         self.canvas_width, self.canvas_height = 320, 180
         self.position_canvas = tk.Canvas(parent_frame, width=self.canvas_width, height=self.canvas_height, bg='#222222',
                                          cursor='crosshair')
         self.position_canvas.grid(row=row, column=1, columnspan=2, pady=5)
         self.position_canvas.bind("<Button-1>", self.on_canvas_click)
-        self.pos_label_var = tk.StringVar(value="Select position for 'static' animation")
+        self.pos_label_var = tk.StringVar(value="Wybierz pozycję dla animacji 'statycznej'")
         ttk.Label(parent_frame, textvariable=self.pos_label_var).grid(row=row + 1, column=1, columnspan=2)
 
-        # Image Duration (only visible if it's an image)
+        # Czas trwania obrazu (widoczne tylko, jeśli to obraz)
         if self.is_image:
-            img_dur_frame = ttk.LabelFrame(self.config_frame, text="Image Settings", padding=10)
+            img_dur_frame = ttk.LabelFrame(self.config_frame, text="Ustawienia obrazu", padding=10)
             img_dur_frame.grid(row=row + 2, column=0, columnspan=3, sticky='ew', pady=(20, 0))
-            ttk.Label(img_dur_frame, text="Image Duration (s):").pack(side=tk.LEFT, padx=5)
+            ttk.Label(img_dur_frame, text="Czas trwania obrazu (s):").pack(side=tk.LEFT, padx=5)
             self.image_duration_var = tk.IntVar(value=self.image_duration)
             ttk.Spinbox(img_dur_frame, from_=1, to=300, textvariable=self.image_duration_var).pack(side=tk.LEFT)
 
     def choose_bg_color(self):
-        color_code = colorchooser.askcolor(title="Choose background color", parent=self.dialog)
+        color_code = colorchooser.askcolor(title="Wybierz kolor tła", parent=self.dialog)
         if color_code and color_code[1]:
             self.bg_color_var.set(color_code[1])
             self.update_selected_text_data()
@@ -316,10 +323,10 @@ class VideoConfigDialog:
         for item in self.texts_tree.get_children():
             self.texts_tree.delete(item)
         for i, text_data in enumerate(self.texts_data):
-            text_content = text_data.get('text', 'No Text')
+            text_content = text_data.get('text', 'Brak tekstu')
             start = text_data['config'].get('start_time', 0)
             dur = text_data['config'].get('duration', 0)
-            timing_str = f"{start} - {start + dur if dur > 0 else 'end'}"
+            timing_str = f"{start} - {start + dur if dur > 0 else 'koniec'}"
             self.texts_tree.insert('', 'end', iid=i, values=(i + 1, text_content, timing_str))
 
     def on_text_selected(self, event=None):
@@ -351,6 +358,8 @@ class VideoConfigDialog:
         self.duration_var.set(config.get('duration', 0))
         self.movement_var.set(config.get('movement', 'static'))
         self.alignment_var.set(config.get('alignment', 'center'))
+        wrap_width = config.get('wrap_width')
+        self.wrap_width_var.set(wrap_width if wrap_width is not None else 0)
         self.update_canvas(config.get('position'), config.get('movement'))
         pos = config.get('position')
         if (isinstance(pos, (tuple, list)) and len(pos) == 2 and
@@ -364,6 +373,7 @@ class VideoConfigDialog:
                 y_percent = pos[1] / self.canvas_height
                 config['position'] = (x_percent, y_percent)
                 self.texts_data[self.selected_text_id]['config']['position'] = (x_percent, y_percent)
+
     def update_selected_text_data(self, event=None):
         if self.selected_text_id is None or self.selected_text_id >= len(self.texts_data):
             return
@@ -371,10 +381,9 @@ class VideoConfigDialog:
         try:
             start_time = self.start_time_var.get()
             duration = self.duration_var.get()
+            wrap_width = self.wrap_width_var.get()
         except tk.TclError:
             return
-
-
 
         new_config = {
             'fontsize': self.fontsize_var.get(),
@@ -385,11 +394,14 @@ class VideoConfigDialog:
             'start_time': start_time,
             'bg_color': self.bg_color_var.get().strip() or None,
             'duration': duration,
+            'wrap_width': wrap_width if wrap_width > 0 else None,
             'position': self.texts_data[self.selected_text_id]['config'].get('position')
         }
 
         new_text = self.text_widget.get("1.0", "end-1c")
         self.texts_data[self.selected_text_id]['text'] = new_text
+        self.texts_data[self.selected_text_id]['config'].pop('wrap_width', None)
+
         self.texts_data[self.selected_text_id]['config'] = new_config
 
         self.opacity_label.config(text=f"{new_config['opacity']:.1f}")
@@ -402,12 +414,12 @@ class VideoConfigDialog:
     def add_text(self):
         center_pos = (self.canvas_width / 2, self.canvas_height / 2)
         new_text_data = {
-            'text': 'New Text',
+            'text': 'Nowy tekst',
             'config': {
                 'fontsize': 50, 'color': 'white', 'movement': 'static',
                 'opacity': 0.8, 'position': center_pos,
                 'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold',
-                'alignment': 'center', 'bg_color': None
+                'alignment': 'center', 'bg_color': None, 'wrap_width': None
             }
         }
         self.texts_data.append(new_text_data)
@@ -418,7 +430,7 @@ class VideoConfigDialog:
 
     def remove_text(self):
         if self.selected_text_id is None:
-            messagebox.showwarning("Warning", "Please select a text to remove.", parent=self.dialog)
+            messagebox.showwarning("Ostrzeżenie", "Proszę wybrać tekst do usunięcia.", parent=self.dialog)
             return
 
         self.texts_data.pop(self.selected_text_id)
@@ -428,7 +440,7 @@ class VideoConfigDialog:
 
     def choose_color(self):
         if self.selected_text_id is None: return
-        color_code = colorchooser.askcolor(title="Choose color", parent=self.dialog)
+        color_code = colorchooser.askcolor(title="Wybierz kolor", parent=self.dialog)
         if color_code and color_code[1]:
             self.color_var.set(color_code[1])
             self.update_selected_text_data()
@@ -455,15 +467,15 @@ class VideoConfigDialog:
                 if isinstance(x, (int, float)) and isinstance(y, (int, float)):
                     self.position_canvas.create_line(x - 8, y, x + 8, y, fill='red', tags="marker", width=2)
                     self.position_canvas.create_line(x, y - 8, x, y + 8, fill='red', tags="marker", width=2)
-                    self.pos_label_var.set(f"Position: ({int(x)}, {int(y)})")
+                    self.pos_label_var.set(f"Pozycja: ({int(x)}, {int(y)})")
                 else:
-                    self.pos_label_var.set("Click to set position")
+                    self.pos_label_var.set("Kliknij, aby ustawić pozycję")
             else:
-                self.pos_label_var.set("Click to set position")
+                self.pos_label_var.set("Kliknij, aby ustawić pozycję")
         else:
             self.position_canvas.config(state=tk.DISABLED, cursor='', bg='grey')
             anim_name = movement.capitalize()
-            self.pos_label_var.set(f"Position controlled by '{anim_name}'")
+            self.pos_label_var.set(f"Pozycja kontrolowana przez '{anim_name}'")
 
     def toggle_config_controls_state(self, disabled=True):
         state = tk.DISABLED if disabled else tk.NORMAL
@@ -484,14 +496,14 @@ class VideoConfigDialog:
         else:
             self.position_canvas.config(state=tk.NORMAL, bg='#222222')
         if disabled:
-            self.config_frame.config(text="Text Configuration (select a text to edit)")
+            self.config_frame.config(text="Konfiguracja tekstu (wybierz tekst do edycji)")
         elif self.selected_text_id is not None:
-            self.config_frame.config(text=f"Editing Text #{self.selected_text_id + 1}")
+            self.config_frame.config(text=f"Edytowanie tekstu nr {self.selected_text_id + 1}")
 
     def ok_clicked(self):
         video_path = self.video_var.get().strip()
         if not video_path or not os.path.exists(video_path):
-            messagebox.showerror("Error", "Please select a valid file.", parent=self.dialog)
+            messagebox.showerror("Błąd", "Proszę wybrać prawidłowy plik.", parent=self.dialog)
             return
         if self.is_image:
             duration = self.image_duration_var.get()
@@ -506,7 +518,6 @@ class VideoConfigDialog:
 
 
 class TemplateConfigDialog:
-    # ... (Ta klasa pozostaje bez zmian) ...
     def __init__(self, parent, title, clips_data=None):
         self.parent = parent
         self.clips_data = copy.deepcopy(clips_data) if clips_data is not None else []
@@ -522,24 +533,23 @@ class TemplateConfigDialog:
         self.update_file_list()
         self.dialog.protocol("WM_DELETE_WINDOW", self.cancel_clicked)
 
-
     def setup_dialog_ui(self):
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(2, weight=1)
 
-        title_label = ttk.Label(main_frame, text="Template Clip Configuration", font=('Arial', 16, 'bold'))
+        title_label = ttk.Label(main_frame, text="Konfiguracja szablonu klipów", font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
 
-        list_label = ttk.Label(main_frame, text="Template Clips:", font=('Arial', 12, 'bold'))
+        list_label = ttk.Label(main_frame, text="Klipy szablonu:", font=('Arial', 12, 'bold'))
         list_label.grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(0, 10))
 
         columns = ('Order', 'File', 'Text Overlays')
         self.tree = ttk.Treeview(main_frame, columns=columns, show='headings', height=10)
         self.tree.heading('Order', text='#')
-        self.tree.heading('File', text='File')
-        self.tree.heading('Text Overlays', text='Text Overlays')
+        self.tree.heading('File', text='Plik')
+        self.tree.heading('Text Overlays', text='Nakładki tekstowe')
         self.tree.column('Order', width=50, anchor='center', stretch=tk.NO)
         self.tree.column('File', width=400)
         self.tree.column('Text Overlays', width=150, anchor='center')
@@ -550,20 +560,17 @@ class TemplateConfigDialog:
 
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=3, column=0, columnspan=3, pady=(0, 20))
-        ttk.Button(button_frame, text="Add File", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
-        ttk.Button(button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1,
+        ttk.Button(button_frame, text="Dodaj plik", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(button_frame, text="Edytuj zaznaczone", command=self.edit_file_dialog).grid(row=0, column=1,
                                                                                            padx=(0, 10))
-        ttk.Button(button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2, padx=(0, 10))
-        ttk.Button(button_frame, text="Move Up", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
-        ttk.Button(button_frame, text="Move Down", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
-        ttk.Button(button_frame, text="Clear All", command=self.clear_all_files).grid(row=0, column=5)
+        ttk.Button(button_frame, text="Usuń zaznaczone", command=self.remove_file).grid(row=0, column=2, padx=(0, 10))
+        ttk.Button(button_frame, text="Przesuń w górę", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
+        ttk.Button(button_frame, text="Przesuń w dół", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
+        ttk.Button(button_frame, text="Usuń wszystko", command=self.clear_all_files).grid(row=0, column=5)
 
         bottom_button_frame = ttk.Frame(main_frame)
         bottom_button_frame.grid(row=4, column=0, columnspan=3, pady=(10, 0), sticky="e")
         self.should_save_template = tk.BooleanVar(value=False)
-
-
-
 
         def on_toggle_save():
             if self.should_save_template.get():
@@ -582,18 +589,18 @@ class TemplateConfigDialog:
             command=on_toggle_save
         ).pack(side=tk.LEFT, padx=(10, 20))
         ttk.Button(bottom_button_frame, text="OK", command=self.ok_clicked).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(bottom_button_frame, text="Cancel", command=self.cancel_clicked).pack(side=tk.LEFT)
+        ttk.Button(bottom_button_frame, text="Anuluj", command=self.cancel_clicked).pack(side=tk.LEFT)
 
     def add_file_dialog(self):
         path = filedialog.askopenfilename(
             title="Wybierz plik wideo lub obraz",
-            filetypes=[("Video/Image", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png")]
+            filetypes=[("Wideo/Obraz", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png")]
         )
         if not path:
             return
 
         is_image = path.lower().endswith(('.jpg', '.jpeg', '.png'))
-        dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip", video_path=path, texts_data=[],
+        dialog = VideoConfigDialog(self.dialog, "Dodaj/Edytuj tekst na klipie", video_path=path, texts_data=[],
                                    is_image=is_image)
         self.dialog.wait_window(dialog.dialog)
 
@@ -611,14 +618,14 @@ class TemplateConfigDialog:
     def edit_file_dialog(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("No Selection", "Please select a file to edit.", parent=self.dialog)
+            messagebox.showwarning("Nic nie zaznaczono", "Proszę wybrać plik do edycji.", parent=self.dialog)
             return
 
         item = selection[0]
         index = self.tree.index(item)
         clip_data = self.clips_data[index]
 
-        dialog = VideoConfigDialog(self.dialog, "Add/Edit Text on Clip",
+        dialog = VideoConfigDialog(self.dialog, "Dodaj/Edytuj tekst na klipie",
                                    video_path=clip_data['path'],
                                    texts_data=clip_data['texts'],
                                    is_image=clip_data['is_image'],
@@ -635,7 +642,7 @@ class TemplateConfigDialog:
     def remove_file(self):
         selection = self.tree.selection()
         if not selection:
-            messagebox.showwarning("No Selection", "Please select a file to remove.", parent=self.dialog)
+            messagebox.showwarning("Nic nie zaznaczono", "Proszę wybrać plik do usunięcia.", parent=self.dialog)
             return
 
         indices = sorted([self.tree.index(item) for item in selection], reverse=True)
@@ -692,3 +699,6 @@ class TemplateConfigDialog:
     def cancel_clicked(self):
         self.result = None
         self.dialog.destroy()
+
+
+import copy

@@ -14,7 +14,7 @@ import data_load
 class VideoMergerGUI:
     def __init__(self, root, template_manager):
         self.root = root
-        self.root.title("Video Merger with Floating Text")
+        self.root.title("Video Merger")
         self.root.geometry("900x700")
         self.template_manager = template_manager
         self.merger = VideoMerger()
@@ -30,9 +30,9 @@ class VideoMergerGUI:
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
         template_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Template", menu=template_menu)
-        template_menu.add_command(label="Edit Pre-Clips Template", command=self.edit_pre_clips_template)
-        template_menu.add_command(label="Edit Post-Clips Template", command=self.edit_post_clips_template)
+        menubar.add_cascade(label="Szablony", menu=template_menu)
+        template_menu.add_command(label="Edytuj szablon przed filmem", command=self.edit_pre_clips_template)
+        template_menu.add_command(label="Edytuj szablon po filmie", command=self.edit_post_clips_template)
 
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -205,28 +205,28 @@ class VideoMergerGUI:
     def setup_control_buttons(self, parent):
         self.button_frame = ttk.Frame(parent)
         self.button_frame.grid(row=4, column=0, columnspan=3, pady=(0, 20))
-        ttk.Button(self.button_frame, text="Add File", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
-        ttk.Button(self.button_frame, text="Edit Selected", command=self.edit_file_dialog).grid(row=0, column=1,
+        ttk.Button(self.button_frame, text="Dodaj plik", command=self.add_file_dialog).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(self.button_frame, text="Edytuj zaznaczone", command=self.edit_file_dialog).grid(row=0, column=1,
                                                                                                 padx=(0, 10))
-        ttk.Button(self.button_frame, text="Remove Selected", command=self.remove_file).grid(row=0, column=2,
+        ttk.Button(self.button_frame, text="Usuń zaznaczone", command=self.remove_file).grid(row=0, column=2,
                                                                                              padx=(0, 10))
-        ttk.Button(self.button_frame, text="Move Up", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
-        ttk.Button(self.button_frame, text="Move Down", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
-        ttk.Button(self.button_frame, text="Clear All", command=self.clear_all_files).grid(row=0, column=5)
+        ttk.Button(self.button_frame, text="Przesuń w górę", command=self.move_file_up).grid(row=0, column=3, padx=(0, 10))
+        ttk.Button(self.button_frame, text="Przesuń w dół", command=self.move_file_down).grid(row=0, column=4, padx=(0, 10))
+        ttk.Button(self.button_frame, text="Usuń wszystko", command=self.clear_all_files).grid(row=0, column=5)
 
     def setup_output_settings(self, parent):
-        output_frame = ttk.LabelFrame(parent, text="Output Settings", padding="10")
+        output_frame = ttk.LabelFrame(parent, text="Ustawienia wyjścia", padding="10")
         output_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         output_frame.columnconfigure(1, weight=1)
-        ttk.Label(output_frame, text="Output File:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        ttk.Label(output_frame, text="Plik Wyjściowy:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
         self.output_var = tk.StringVar(value=f"{self.item_no_var}.mp4")
         ttk.Entry(output_frame, textvariable=self.output_var).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
-        ttk.Button(output_frame, text="Browse", command=self.browse_output_file).grid(row=0, column=2)
-        ttk.Button(output_frame, text="Merge Files", command=self.start_merge_process).grid(row=1, column=0,
+        ttk.Button(output_frame, text="Szukaj", command=self.browse_output_file).grid(row=0, column=2)
+        ttk.Button(output_frame, text="Generuj film", command=self.start_merge_process).grid(row=1, column=0,
                                                                                             columnspan=3, pady=(10, 0))
 
     def setup_progress_area(self, parent):
-        progress_frame = ttk.LabelFrame(parent, text="Progress", padding="10")
+        progress_frame = ttk.LabelFrame(parent, text="Postęp", padding="10")
         progress_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E))
         progress_frame.columnconfigure(0, weight=1)
         self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate', maximum=100)

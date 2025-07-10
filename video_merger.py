@@ -95,9 +95,8 @@ class VideoMerger:
         if text_start > clip_duration:
             return None
 
-        default_margin = 20
-        wrap_width = config.get('wrap_width',
-                                self.final_size[0] - 2 * default_margin if hasattr(self, 'final_size') else None)
+
+        wrap_width = config.get('wrap_width')
 
 
         align_raw = config.get('alignment', 'center')
