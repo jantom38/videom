@@ -54,62 +54,99 @@ class VideoMerger:
         })
 
     # NOWOŚĆ: Funkcja do rozwiązywania symboli zastępczych
-    def _resolve_text(self, text, item_no):
-        """Resolves placeholder text into actual data using the provided item_no."""
-        if not item_no or not text.startswith('{') or not text.endswith('}'):
+    def _resolve_text(self, text: str, item_no: str) -> str:
+        """
+        Zamienia wszystkie placeholdery w podanym tekście na realne dane.
+        Pozostawia tekst bez zmian, jeśli item_no jest pusty lub żaden symbol nie pasuje.
+        """
+        if not item_no:
             return text
 
-        placeholder = text.upper()  # Używamy wielkich liter dla spójności
-
+        # 1. Zbuduj słownik danych (raz – żeby nie wołać do Excela przy każdym symbolu)
         try:
-            if placeholder == "{NAZWA_PL}":
-                return data_load.load_names(item_no).get("PL", "Brak nazwy PL")
-            elif placeholder == "{NAZWA_EN}":
-                return data_load.load_names(item_no).get("EN", "Brak nazwy EN")
-            elif placeholder == "{OPIS}":
-                return data_load.load_description(item_no)
-            elif placeholder == "{MATERIALY}":
-                return data_load.load_materials(item_no)
-            else:
-                return text  # Zwróć oryginalny tekst, jeśli nie rozpoznano symbolu
+            names = data_load.load_names(item_no)
+            data_map = {
+                "{INDEKS}": item_no,
+                "{NAZWA_PL}": names.get("PL", "Brak nazwy PL"),
+                "{NAZWA_EN}": names.get("EN", "Brak nazwy EN"),
+                "{OPIS}": data_load.load_description(item_no),
+                "{MATERIALY}": data_load.load_materials(item_no),
+            }
         except Exception as e:
-            print(f"Błąd podczas rozwiązywania symbolu '{text}' dla indeksu '{item_no}': {e}")
-            return f"Błąd danych dla {text}"
+            print(f"Błąd _resolve_text dla {item_no}: {e}")
+            return text  # zostaw oryginał, jeśli nie udało się pobrać danych
+
+        # 2. Podmień *wszystkie* wystąpienia znanych kluczy – bez względu na wielkość liter
+        def repl(match):
+            key = match.group(0).upper()
+            return str(data_map.get(key, match.group(0)))
+
+        pattern = re.compile("|".join(re.escape(k) for k in data_map.keys()), re.IGNORECASE)
+        return pattern.sub(repl, text)
+
+    # W pliku video_merger.py
 
     def create_text_clip(self, text_content, config, clip_duration):
         text_start = config.get('start_time', 0)
         text_dur = config.get('duration')
 
-        # Jeśli duration jest 0 lub None, oznacza to pełną długość
         duration = text_dur if text_dur else clip_duration
 
         if text_start > clip_duration:
-            return None  # Tekst zaczyna się po zakończeniu klipu
+            return None
 
-        # --- POCZĄTEK ZMIAN ---
+        default_margin = 20
+        wrap_width = config.get('wrap_width',
+                                self.final_size[0] - 2 * default_margin if hasattr(self, 'final_size') else None)
 
-        # Pobierz szerokość zawijania z konfiguracji
-        wrap_width = config.get('wrap_width')
 
-        # Przygotuj słownik argumentów dla TextClip
+        align_raw = config.get('alignment', 'center')
+        align_map = {'left': 'west', 'center': 'center', 'right': 'east'}
+        align = align_map.get(align_raw.lower(), 'center')
+
         textclip_kwargs = {
             'txt': text_content,
             'fontsize': config.get('fontsize', 50),
             'color': config.get('color', 'white'),
             'font': config.get('font', 'Arial-Bold'),
+            'align': align
         }
 
-        # Jeśli szerokość zawijania jest zdefiniowana, użyj metody 'caption'
         if wrap_width:
             textclip_kwargs['method'] = 'caption'
-            textclip_kwargs['align'] = 'center'
-            # 'size' jest prawidłowym argumentem do ustawienia szerokości
             textclip_kwargs['size'] = (wrap_width, None)
 
-        # Utwórz klip tekstowy, przekazując argumenty ze słownika
         txt_clip = TextClip(**textclip_kwargs)
 
-        # --- KONIEC ZMIAN ---
+        # --- POCZĄTEK POPRAWIONEJ LOGIKI TŁA ---
+        background_color = config.get('bg_color')
+        if (background_color and background_color!="None"):
+            try:
+                # Domyślnie używamy oryginalnej wartości
+                rgb_color = background_color
+
+                # Jeśli kolor jest stringiem w formacie hex, konwertujemy go na krotkę RGB
+                if isinstance(background_color, str) and background_color.startswith('#'):
+                    hex_val = background_color.lstrip('#')
+                    # Sprawdzamy, czy ma 6 znaków (RRGGBB)
+                    if len(hex_val) == 6:
+                        # Konwertujemy pary hex na liczby całkowite
+                        rgb_color = tuple(int(hex_val[i:i + 2], 16) for i in (0, 2, 4))
+                    else:
+                        print(f"Ostrzeżenie: Nieprawidłowy format koloru hex: {background_color}. Oczekiwano #RRGGBB.")
+
+                # Ustawiamy tło, używając skonwertowanego koloru RGB
+                txt_clip = txt_clip.on_color(
+                    size=(txt_clip.w + 20, txt_clip.h + 20),  # Dodaj trochę paddingu
+                    color=rgb_color,  # Przekazujemy krotkę RGB
+                    pos=('center', 'center'),
+                    col_opacity=config.get('background_opacity', 1.0)
+                )
+            except Exception as e:
+                # Lepsze logowanie błędów
+                print(f"Ostrzeżenie: Nie udało się ustawić koloru tła '{background_color}'. Błąd: {e}")
+                traceback.print_exc()
+        # --- KONIEC POPRAWIONEJ LOGIKI TŁA ---
 
         txt_clip = txt_clip.set_duration(duration).set_start(text_start)
         txt_clip = txt_clip.set_opacity(config.get('opacity', 0.8))
@@ -125,15 +162,19 @@ class VideoMerger:
                     x = pos[0] * self.final_size[0]
                     y = pos[1] * self.final_size[1]
 
-                    # 🔽 Skoryguj pozycję, żeby była względem środka tekstu
-                    x -= txt_clip.w / 2
-                    y -= txt_clip.h / 2
+                    alignment = config.get('alignment', 'center')
+                    if alignment == 'left':
+                        y -= txt_clip.h / 2
+                    elif alignment == 'right':
+                        x -= txt_clip.w
+                        y -= txt_clip.h / 2
+                    else:  # center
+                        x -= txt_clip.w / 2
+                        y -= txt_clip.h / 2
 
                     pos = (x, y)
 
             txt_clip = txt_clip.set_position(pos)
-
-
 
         return txt_clip
 

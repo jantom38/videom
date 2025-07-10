@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import os
 import data_load
-
+from tkinter.scrolledtext import ScrolledText
 os.environ['IMAGEMAGICK_BINARY'] = r'C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe'
 import copy
 
@@ -102,6 +102,7 @@ class VideoConfigDialog:
                 'opacity': 0.9,
                 'position': position,
                 'start_time': 0.0,
+                'alignment': 'center',
                 'duration': 0.0,
                 'font': 'Arial-Bold',
                 'wrap_width': wrap_width  # Add wrapping capability
@@ -199,10 +200,10 @@ class VideoConfigDialog:
         row = 0
         # Text Content
         ttk.Label(parent_frame, text="Text:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        self.text_var = tk.StringVar()
-        self.text_entry = ttk.Entry(parent_frame, textvariable=self.text_var)
-        self.text_entry.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
-        self.text_entry.bind("<KeyRelease>", self.update_selected_text_data)
+        self.text_widget = ScrolledText(parent_frame, height=4, wrap='word')
+        self.text_widget.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+        self.text_widget.bind("<KeyRelease>", self.update_selected_text_data)
+        self.text_widget.bind("<Control-Return>", lambda e: self.ok_clicked())  # skrót klawiszowy Ctrl+Enter
         row += 1
 
         # Font Size
@@ -222,6 +223,16 @@ class VideoConfigDialog:
         color_entry.bind("<KeyRelease>", self.update_selected_text_data)
         ttk.Button(parent_frame, text="Choose", command=self.choose_color).grid(row=row, column=2, padx=5)
         row += 1
+
+        # Background Color
+        ttk.Label(parent_frame, text="BG color:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.bg_color_var = tk.StringVar(value='')  # pusty = brak tła
+        self.bg_entry = ttk.Entry(parent_frame, textvariable=self.bg_color_var)
+        self.bg_entry.grid(row=row, column=1, sticky="ew")
+        self.bg_entry.bind("<KeyRelease>", self.update_selected_text_data)
+        ttk.Button(parent_frame, text="Choose", command=self.choose_bg_color).grid(row=row, column=2, padx=5)
+        row += 1
+
 
         # Opacity
         ttk.Label(parent_frame, text="Opacity:").grid(row=row, column=0, sticky=tk.W, pady=5)
@@ -263,6 +274,19 @@ class VideoConfigDialog:
         self.movement_combo.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
         self.movement_combo.bind("<<ComboboxSelected>>", self.update_selected_text_data)
         row += 1
+        # Alignment
+        ttk.Label(parent_frame, text="Alignment:").grid(row=row, column=0, sticky=tk.W, pady=5)
+        self.alignment_var = tk.StringVar(value='center')
+        self.alignment_combo = ttk.Combobox(
+            parent_frame,
+            textvariable=self.alignment_var,
+            values=['left', 'center', 'right'],
+            state='readonly'
+        )
+        self.alignment_combo.grid(row=row, column=1, columnspan=2, sticky="ew", pady=5)
+        self.alignment_combo.bind("<<ComboboxSelected>>", self.update_selected_text_data)
+        row += 1
+
 
         # Position
         ttk.Label(parent_frame, text="Position:").grid(row=row, column=0, sticky=tk.W, pady=5)
@@ -281,6 +305,12 @@ class VideoConfigDialog:
             ttk.Label(img_dur_frame, text="Image Duration (s):").pack(side=tk.LEFT, padx=5)
             self.image_duration_var = tk.IntVar(value=self.image_duration)
             ttk.Spinbox(img_dur_frame, from_=1, to=300, textvariable=self.image_duration_var).pack(side=tk.LEFT)
+
+    def choose_bg_color(self):
+        color_code = colorchooser.askcolor(title="Choose background color", parent=self.dialog)
+        if color_code and color_code[1]:
+            self.bg_color_var.set(color_code[1])
+            self.update_selected_text_data()
 
     def populate_texts_tree(self):
         for item in self.texts_tree.get_children():
@@ -310,14 +340,17 @@ class VideoConfigDialog:
         data = self.texts_data[self.selected_text_id]
         config = data.get('config', {})
 
-        self.text_var.set(data.get('text', ''))
+        self.text_widget.delete("1.0", "end")
+        self.text_widget.insert("1.0", data.get('text', ''))
         self.fontsize_var.set(config.get('fontsize', 50))
         self.color_var.set(config.get('color', 'white'))
+        self.bg_color_var.set(config.get('bg_color', ''))
         self.opacity_var.set(config.get('opacity', 0.8))
         self.opacity_label.config(text=f"{self.opacity_var.get():.1f}")
         self.start_time_var.set(config.get('start_time', 0))
         self.duration_var.set(config.get('duration', 0))
         self.movement_var.set(config.get('movement', 'static'))
+        self.alignment_var.set(config.get('alignment', 'center'))
         self.update_canvas(config.get('position'), config.get('movement'))
         pos = config.get('position')
         if (isinstance(pos, (tuple, list)) and len(pos) == 2 and
@@ -341,17 +374,22 @@ class VideoConfigDialog:
         except tk.TclError:
             return
 
+
+
         new_config = {
             'fontsize': self.fontsize_var.get(),
             'color': self.color_var.get(),
             'movement': self.movement_var.get(),
+            'alignment': self.alignment_var.get(),
             'opacity': round(self.opacity_var.get(), 2),
             'start_time': start_time,
+            'bg_color': self.bg_color_var.get().strip() or None,
             'duration': duration,
             'position': self.texts_data[self.selected_text_id]['config'].get('position')
         }
 
-        self.texts_data[self.selected_text_id]['text'] = self.text_var.get()
+        new_text = self.text_widget.get("1.0", "end-1c")
+        self.texts_data[self.selected_text_id]['text'] = new_text
         self.texts_data[self.selected_text_id]['config'] = new_config
 
         self.opacity_label.config(text=f"{new_config['opacity']:.1f}")
@@ -368,7 +406,8 @@ class VideoConfigDialog:
             'config': {
                 'fontsize': 50, 'color': 'white', 'movement': 'static',
                 'opacity': 0.8, 'position': center_pos,
-                'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold',
+                'alignment': 'center', 'bg_color': None
             }
         }
         self.texts_data.append(new_text_data)

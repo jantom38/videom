@@ -13,74 +13,93 @@
             "image_duration": null
         },
         {
-            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/logo poziom.png",
+            "path": "C:/Users/jtomasik/Desktop/szablony/Aplikacja do film\u00f3w 1/Aplikacja do film\u00f3w/tlo_Obszar roboczy 1 kopia.png",
             "texts": [
                 {
-                    "text": "{NAZWA_PL}",
+                    "text": "Bluzki lato I XXL",
                     "config": {
-                        "fontsize": 50,
+                        "fontsize": 40,
                         "color": "white",
                         "movement": "static",
+                        "alignment": "center",
                         "opacity": 0.9,
+                        "start_time": 0.0,
+                        "bg_color": "None",
+                        "duration": 0.0,
                         "position": [
                             0.5,
-                            0.5
-                        ],
-                        "start_time": 0.0,
-                        "duration": 0.0,
-                        "font": "Arial-Bold",
-                        "wrap_width": null
+                            0.4444444444444444
+                        ]
                     }
                 },
                 {
-                    "text": "{NAZWA_EN}",
+                    "text": "Blouses summer I XXL",
                     "config": {
-                        "fontsize": 30,
+                        "fontsize": 35,
                         "color": "white",
                         "movement": "static",
+                        "alignment": "center",
                         "opacity": 0.9,
+                        "start_time": 0.0,
+                        "bg_color": "None",
+                        "duration": 0.0,
                         "position": [
                             0.5,
-                            0.6
-                        ],
-                        "start_time": 0.0,
-                        "duration": 0.0,
-                        "font": "Arial-Bold",
-                        "wrap_width": null
+                            0.5055555555555555
+                        ]
                     }
                 },
                 {
-                    "text": "{OPIS}",
+                    "text": "Bluzki damskie powy\u017cej rozmiaru 42, hippy i klasyka, r\u0119kaw kr\u00f3tki, na rami\u0105czkach. ",
                     "config": {
                         "fontsize": 20,
                         "color": "white",
                         "movement": "static",
-                        "opacity": 0.9,
+                        "alignment": "center",
+                        "opacity": 0.81,
+                        "start_time": 0.0,
+                        "bg_color": "None",
+                        "duration": 0.0,
                         "position": [
                             0.5,
-                            0.8
-                        ],
-                        "start_time": 0.0,
-                        "duration": 0.0,
-                        "font": "Arial-Bold",
-                        "wrap_width": 280
+                            0.7
+                        ]
+
                     }
                 },
                 {
-                    "text": "{MATERIALY}",
+                    "text": "materia\u0142y: Cienka bawe\u0142na, wiskoza, poliester, polo syntetyk, (syntetyczny  rozci\u0105gliwy), cienki jeans, len",
                     "config": {
                         "fontsize": 20,
                         "color": "white",
                         "movement": "static",
-                        "opacity": 0.9,
+                        "alignment": "center",
+                        "opacity": 0.66,
+                        "start_time": 0.0,
+                        "bg_color": "None",
+                        "duration": 0.0,
                         "position": [
                             0.5,
                             0.9
-                        ],
+                        ]
+
+                    }
+                },
+                {
+                    "text": "10033",
+                    "config": {
+                        "fontsize": 40,
+                        "color": "#000000",
+                        "movement": "static",
+                        "alignment": "center",
+                        "opacity": 0.9,
                         "start_time": 0.0,
+                        "bg_color": "#ffffff",
                         "duration": 0.0,
-                        "font": "Arial-Bold",
-                        "wrap_width": 280
+                        "position": [
+                            0.5,
+                            0.3111111111111111
+                        ]
                     }
                 }
             ],

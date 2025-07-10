@@ -245,17 +245,17 @@ class VideoMergerGUI:
             {
                 'text': '{indeks}',
                 'config': {
-                    'fontsize': 30, 'color': 'white', 'movement': 'static',
-                    'opacity': 0.9, 'position': (0.15, 0.15),  # Lewy górny róg
-                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                    'fontsize': 30,'color': 'black','bg_color':'#ffffff', 'movement': 'static',
+                    'opacity': 0.9, 'position': (0.05, 0.15),  # Lewy górny róg
+                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold','alignment':'left'
                 }
             },
             {
                 'text': '{NAZWA_PL}',
                 'config': {
-                    'fontsize': 30, 'color': 'white', 'movement': 'static',
-                    'opacity': 0.9, 'position': (0.25, 0.1),  # Lewy górny róg
-                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold'
+                    'fontsize': 30,'color': 'white', 'movement': 'static',
+                    'opacity': 0.9, 'position': (0.05, 0.09),  # Lewy górny róg
+                    'start_time': 0, 'duration': 0.0, 'font': 'Arial-Bold','alignment':'left'
                 }
             },
             {
